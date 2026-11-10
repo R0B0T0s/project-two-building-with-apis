@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browse Rules Prototype</title>
+<!-- THROWAWAY PROTOTYPE for Movie Rental Q7 (search / filter / sort / pagination). Not production code. -->
+<style>
+  :root { --accent:#2f6fde; --bg:#f7f7f9; --card:#fff; --ink:#1d1d22; --muted:#6b6b76; --line:#e2e2e8; --hi:#fff6d6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { margin:0 0 4px; font-size:24px; }
+  h2 { font-size:16px; margin:0 0 10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .intro { color:var(--muted); max-width:780px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:18px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
+  select, input[type=text], input[type=number] { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  input[type=number] { width:90px; }
+  button { font:inherit; padding:6px 12px; border-radius:6px; border:1px solid var(--accent); background:#fff; color:var(--accent); cursor:pointer; }
+  button.primary, button.on { background:var(--accent); color:#fff; }
+  button:disabled { opacity:.4; cursor:default; }
+  .check { flex-direction:row; align-items:center; gap:6px; color:var(--ink); font-size:14px; }
+  .state { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
+  .field { border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+  .field b { display:block; font-size:12px; color:var(--muted); font-weight:500; }
+  .field.changed { background:var(--hi); border-color:#e8cf72; }
+  .changed-note { margin-top:10px; font-size:14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-top:12px; }
+  .movie { border:1px solid var(--line); border-radius:8px; padding:10px; font-size:14px; }
+  .movie .t { font-weight:600; }
+  .tag { display:inline-block; font-size:12px; padding:1px 7px; border-radius:10px; background:#eef2fb; color:#2a4f99; margin:2px 2px 0 0; }
+  .tag.over { background:#fde8e8; color:#a12626; }
+  .muted { color:var(--muted); }
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .steps { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+  .steps button { text-align:left; }
+  .steps button.done { border-color:var(--line); color:var(--muted); }
+  .why { background:#f2f6ff; border-left:3px solid var(--accent); padding:8px 12px; margin-top:10px; font-size:14px; }
+  .pager { margin-top:12px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Movie Rental: browse rules prototype</h1>
+  <p class="intro"><b>Question:</b> Do the planned search, filter, sort and pagination rules for <i>My Library</i> and <i>Community</i> feel right?
+  You can switch who is signed in and which page you're on, then search, filter, sort and page through 34 fake saved movies.
+  The <b>Experiments</b> switches turn the undecided options on and off so you can compare them.
+  "Today" is fixed at <b>Nov 9, 2026</b>. Nothing is saved; reloading resets everything.</p>
+
+  <section>
+    <h2>Guided walkthroughs</h2>
+    <div class="tabs" id="tabs"></div>
+    <div id="scenario"></div>
+  </section>
+
+  <section>
+    <h2>Experiments (undecided options)</h2>
+    <div class="row" id="experiments"></div>
+  </section>
+
+  <section>
+    <h2>Free play</h2>
+    <div class="row" id="controls"></div>
+  </section>
+
+  <section>
+    <h2>Current state</h2>
+    <div class="state" id="state"></div>
+    <div class="changed-note" id="changed"></div>
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <div id="summary"></div>
+    <div class="grid" id="results"></div>
+    <div class="pager" id="pager"></div>
+  </section>
+</main>
+
+<script>
+/* ===================== PURE LOGIC MODULE (no DOM) ===================== */
+const Logic = (() => {
+  const TODAY = "2026-11-09";
+  const PER_PAGE = 12;
+  const STAFF = ["erin (employee)", "adam (admin)"];
+
+  function canView(item, viewer) {
+    if (viewer === "anonymous") return item.visibility === "Public";
+    if (item.owner === viewer || STAFF.includes(viewer)) return true;
+    if (item.visibility === "Public") return true;
+    return item.visibility === "Shared" && item.sharedWith.includes(viewer);
+  }
+
+  // Which rows a page starts from, before any search/filter.
+  function baseRows(items, viewer, page) {
+    if (page === "library") return viewer === "anonymous" ? [] : items.filter(i => i.owner === viewer);
+    return items.filter(i => i.owner !== viewer && canView(i, viewer)); // Community = other people's visible items
+  }
+
+  const isOverdue = i => i.status === "Rented" && i.dueAt && i.dueAt < TODAY;
+  const sortTitle = (t, ignoreArticle) => (ignoreArticle ? t.replace(/^(the|a|an)\s+/i, "") : t).toLowerCase();
+
+  function compare(a, b, sort, exp) {
+    const nullsLast = (x, y, dir) => (x == null && y == null) ? 0 : x == null ? 1 : y == null ? -1 : (x - y) * dir;
+    let r = 0;
+    switch (sort) {
+      case "saved_new": r = b.savedAt.localeCompare(a.savedAt); break;
+      case "saved_old": r = a.savedAt.localeCompare(b.savedAt); break;
+      case "title": r = sortTitle(a.title, exp.ignoreArticle).localeCompare(sortTitle(b.title, exp.ignoreArticle)); break;
+      case "year_new": r = nullsLast(a.year, b.year, -1); break;
+      case "year_old": r = nullsLast(a.year, b.year, 1); break;
+      case "rating_high": r = nullsLast(a.rating, b.rating, -1); break;
+      case "rating_low": r = nullsLast(a.rating, b.rating, 1); break;
+    }
+    return r || a.id - b.id; // stable tie-breaker so pages never shuffle
+  }
+
+  function query(items, s) {
+    const exp = s.exp;
+    let rows = baseRows(items, s.viewer, s.page);
+    const startCount = rows.length;
+    const q = s.search.trim().toLowerCase();
+    if (q) rows = rows.filter(i => i.title.toLowerCase().includes(q) || (exp.searchNotes && i.notes.toLowerCase().includes(q)));
+    if (s.status) rows = rows.filter(i => i.status === s.status);
+    if (s.genre) rows = rows.filter(i => i.genres.includes(s.genre));
+    if (s.minRating) rows = rows.filter(i => i.rating != null && i.rating >= s.minRating);
+    if (s.page === "library" && s.visibility) rows = rows.filter(i => i.visibility === s.visibility);
+    if (exp.overdueFilter && s.overdueOnly) rows = rows.filter(isOverdue);
+    if (exp.yearRange && s.yearFrom) rows = rows.filter(i => i.year != null && i.year >= s.yearFrom);
+    if (exp.yearRange && s.yearTo) rows = rows.filter(i => i.year != null && i.year <= s.yearTo);
+    rows = [...rows].sort((a, b) => compare(a, b, s.sort, exp));
+    const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+    const pageNum = Math.min(s.pageNum, pages); // asking for a page past the end shows the last one
+    return { startCount, total: rows.length, pages, pageNum, rows: rows.slice((pageNum - 1) * PER_PAGE, pageNum * PER_PAGE) };
+  }
+
+  const initial = () => ({
+    viewer: "alice", page: "library", search: "", status: "", genre: "", minRating: 0, visibility: "",
+    overdueOnly: false, yearFrom: 0, yearTo: 0, sort: "saved_new", pageNum: 1,
+    exp: { searchNotes: true, overdueFilter: true, yearRange: false, ignoreArticle: false },
+  });
+
+  // Any change to who/where/what resets to page 1; only "goto" keeps the page.
+  function reduce(s, a) {
+    switch (a.type) {
+      case "reset": return initial();
+      case "goto": return { ...s, pageNum: a.value };
+      case "exp": return { ...s, pageNum: 1, exp: { ...s.exp, [a.key]: a.value } };
+      case "set": {
+        const n = { ...s, [a.key]: a.value, pageNum: 1 };
+        if (a.key === "viewer" && a.value === "anonymous") n.page = "community";
+        if (a.key === "page" && a.value === "library" && s.viewer === "anonymous") return s; // illegal: must sign in
+        if (a.key === "page" && a.value === "community") n.visibility = ""; // filter only exists on My Library
+        return n;
+      }
+      case "clearFilters": return { ...s, search: "", status: "", genre: "", minRating: 0, visibility: "", overdueOnly: false, yearFrom: 0, yearTo: 0, pageNum: 1 };
+    }
+    return s;
+  }
+
+  return { TODAY, PER_PAGE, canView, query, reduce, initial, isOverdue };
+})();
+
+/* ===================== FAKE DATA ===================== */
+const GENRES = ["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Animation", "Romance", "Thriller"];
+const RAW = [
+  // owner, title, year, genres, status, rating, notes, visibility, sharedWith, savedAt, dueAt
+  ["alice","The Matrix",1999,"Action|Sci-Fi","Watched",5,"Still holds up. Lobby scene!","Public","","2026-10-01",""],
+  ["alice","Inception",2010,"Action|Sci-Fi|Thriller","Watched",4,"Confusing ending, rewatch","Public","","2026-10-03",""],
+  ["alice","Arrival",2016,"Drama|Sci-Fi","Rented",null,"","Private","","2026-11-07","2026-11-09"],
+  ["alice","Toy Story",1995,"Animation|Comedy","Watched",5,"Watched with nephew","Shared","bob","2026-09-12",""],
+  ["alice","Alien",1979,"Horror|Sci-Fi","Want to rent",null,"Bob says it's scary","Private","","2026-11-01",""],
+  ["alice","A Quiet Place",2018,"Horror|Thriller","Rented",null,"","Private","","2026-11-04","2026-11-06"],
+  ["alice","Amélie",2001,"Comedy|Romance","Watched",3,"a bit boring honestly","Public","","2026-08-20",""],
+  ["alice","The Godfather",1972,"Drama","Want to rent",null,"","Public","","2026-10-15",""],
+  ["alice","Up",2009,"Animation|Drama","Watched",4,"cried in first 10 minutes","Public","","2026-07-30",""],
+  ["alice","Heat",1995,"Action|Thriller","Watched",4,"","Private","","2026-06-02",""],
+  ["alice","Coco",2017,"Animation","Watched",5,"","Public","","2026-09-01",""],
+  ["alice","Get Out",2017,"Horror|Thriller","Watched",4,"","Shared","bob|carol","2026-10-20",""],
+  ["alice","Paddington 2",2017,"Comedy|Animation","Want to rent",null,"","Public","","2026-11-08",""],
+  ["alice","Unknown Indie Film",null,"Drama","Want to rent",null,"No release date on TMDB yet","Private","","2026-11-02",""],
+  ["alice","Blade Runner",1982,"Sci-Fi","Rented",2,"rented again, still slow","Public","","2026-11-05","2026-11-12"],
+  ["bob","The Thing",1982,"Horror|Sci-Fi","Watched",5,"best practical effects","Public","","2026-10-10",""],
+  ["bob","Superbad",2007,"Comedy","Watched",3,"boring second half","Public","","2026-09-14",""],
+  ["bob","Parasite",2019,"Drama|Thriller","Rented",null,"","Private","","2026-11-06","2026-11-08"],
+  ["bob","The Notebook",2004,"Romance|Drama","Want to rent",null,"for date night - don't tell anyone","Private","","2026-11-03",""],
+  ["bob","Mad Max: Fury Road",2015,"Action","Watched",5,"","Public","","2026-08-01",""],
+  ["bob","Shrek",2001,"Animation|Comedy","Watched",4,"","Shared","carol","2026-07-07",""],
+  ["bob","Interstellar",2014,"Sci-Fi|Drama","Watched",null,"fell asleep, need to rate later","Public","","2026-10-25",""],
+  ["bob","The Shining",1980,"Horror","Want to rent",null,"","Public","","2026-11-01",""],
+  ["carol","Pride & Prejudice",2005,"Romance|Drama","Watched",5,"","Public","","2026-09-09",""],
+  ["carol","Spirited Away",2001,"Animation","Watched",5,"masterpiece","Shared","bob","2026-08-18",""],
+  ["carol","Die Hard",1988,"Action|Thriller","Rented",null,"Christmas movie debate","Shared","bob","2026-11-02","2026-11-04"],
+  ["carol","Mean Girls",2004,"Comedy","Watched",2,"boring","Private","","2026-06-30",""],
+  ["carol","Hereditary",2018,"Horror|Drama","Want to rent",null,"","Public","","2026-10-30",""],
+  ["carol","The Martian",2015,"Sci-Fi|Drama","Watched",4,"","Public","","2026-07-21",""],
+  ["carol","Knives Out",2019,"Thriller|Comedy","Watched",4,"","Public","","2026-10-05",""],
+  ["carol","Moana",2016,"Animation","Want to rent",null,"","Shared","alice","2026-11-07",""],
+  ["carol","Titanic",1997,"Romance|Drama","Watched",3,"","Public","","2026-05-14",""],
+  ["carol","Jaws",1975,"Thriller|Horror","Rented",null,"","Public","","2026-11-08","2026-11-10"],
+  ["carol","Zootopia",2016,"Animation|Comedy","Watched",4,"","Public","","2026-09-27",""],
+];
+const ITEMS = RAW.map((r, i) => ({ id: i + 1, owner: r[0], title: r[1], year: r[2], genres: r[3].split("|"), status: r[4], rating: r[5],
+  notes: r[6], visibility: r[7], sharedWith: r[8] ? r[8].split("|") : [], savedAt: r[9], dueAt: r[10] || null }));
+
+/* ===================== SCENARIOS ===================== */
+const S = (label, action) => ({ label, action });
+const SCENARIOS = [
+  { name: "1. Happy path", text: "Alice looks for movies she still has out. Watch the count shrink as each filter is added, and the order change when she sorts by title.",
+    steps: [S("Alice opens My Library (15 movies)", {type:"reset"}), S("Filter status = Rented", {type:"set",key:"status",value:"Rented"}),
+            S("Sort by title A–Z", {type:"set",key:"sort",value:"title"}), S("Clear all filters", {type:"clearFilters"})] },
+  { name: "2. Unrated movies", text: "Many saved movies have no rating yet. Watch where they end up when you sort by rating, and that they vanish under '3★ and up'. Is that what users would expect?",
+    steps: [S("Alice opens My Library", {type:"reset"}), S("Sort by my rating, highest first", {type:"set",key:"sort",value:"rating_high"}),
+            S("Sort by my rating, lowest first", {type:"set",key:"sort",value:"rating_low"}), S("Filter 3★ and up", {type:"set",key:"minRating",value:3})] },
+  { name: "3. Page 2 then filter", text: "Bob is on page 2 of Community, then adds a filter that leaves only a few results. Watch whether he lands on an empty page or goes back to page 1.",
+    steps: [S("Bob opens Community", {type:"set",key:"viewer",value:"bob"}), S("Switch to Community", {type:"set",key:"page",value:"community"}),
+            S("Go to page 2", {type:"goto",value:2}), S("Filter genre = Horror", {type:"set",key:"genre",value:"Horror"})] },
+  { name: "4. Searching notes", text: "Notes are searched along with titles. Bob searches 'boring' on Community. He should find Alice's PUBLIC note but never Carol's PRIVATE 'boring' note. Then turn note search off and compare.",
+    steps: [S("Bob on Community", {type:"set",key:"viewer",value:"bob"}), S("Switch to Community", {type:"set",key:"page",value:"community"}),
+            S("Search 'boring'", {type:"set",key:"search",value:"boring"}), S("Experiment: stop searching notes", {type:"exp",key:"searchNotes",value:false})] },
+  { name: "5. Overdue rentals", text: "Candidate filter: 'Overdue' = status Rented AND due date before today (Nov 9). Arrival is due TODAY. Should it count as overdue? (Right now it doesn't.)",
+    steps: [S("Alice opens My Library", {type:"reset"}), S("Filter status = Rented", {type:"set",key:"status",value:"Rented"}),
+            S("Tick 'Overdue only'", {type:"set",key:"overdueOnly",value:true})] },
+  { name: "6. Signed out", text: "An anonymous visitor only gets Community and only sees Public items. Trying to open My Library should do nothing (the real site would send them to sign in).",
+    steps: [S("Sign out (anonymous)", {type:"set",key:"viewer",value:"anonymous"}), S("Try to open My Library", {type:"set",key:"page",value:"library"}),
+            S("Search 'the'", {type:"set",key:"search",value:"the"})] },
+  { name: "7. Sorting 'The'", text: "Sort Alice's library by title. 'The Matrix' and 'The Godfather' file under T, and 'A Quiet Place' under A. Then turn on 'ignore The/A/An' and compare. (Django's plain order_by can't do this; it would need an extra stored 'sort_title' field.)",
+    steps: [S("Alice opens My Library", {type:"reset"}), S("Sort by title A–Z", {type:"set",key:"sort",value:"title"}),
+            S("Experiment: ignore The/A/An", {type:"exp",key:"ignoreArticle",value:true})] },
+  { name: "8. Staff view", text: "Erin is an employee. Community shows her everything except her own saves (none), Private items included, so she has 34 to browse. Search 'tell anyone' to see that she can read Bob's private note. That's the Q4 (i) decision.",
+    steps: [S("Sign in as Erin (employee)", {type:"set",key:"viewer",value:"erin (employee)"}), S("Switch to Community", {type:"set",key:"page",value:"community"}),
+            S("Search 'tell anyone'", {type:"set",key:"search",value:"tell anyone"})] },
+];
+
+/* ===================== PAGE SHELL ===================== */
+let state = Logic.initial(), prev = state, activeTab = 0, stepIdx = 0;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function dispatch(a) { prev = state; state = Logic.reduce(state, a); render(); }
+
+const SORTS = { saved_new:"Date saved (newest)", saved_old:"Date saved (oldest)", title:"Title A–Z", year_new:"Release year (newest)", year_old:"Release year (oldest)", rating_high:"My rating (highest)", rating_low:"My rating (lowest)" };
+const VIEWERS = ["alice","bob","carol","erin (employee)","adam (admin)","anonymous"];
+
+function sel(key, opts, label, value) {
+  return `<label>${label}<select data-key="${key}">${opts.map(([v,t]) => `<option value="${v}" ${String(v)===String(value)?"selected":""}>${t}</option>`).join("")}</select></label>`;
+}
+
+function renderControls() {
+  const s = state, ex = s.exp;
+  let h = sel("viewer", VIEWERS.map(v=>[v,v]), "Signed in as", s.viewer);
+  h += `<label>Page<span class="row" style="gap:4px">
+    <button data-page="library" class="${s.page==="library"?"on":""}" ${s.viewer==="anonymous"?"disabled title='Sign in required'":""}>My Library</button>
+    <button data-page="community" class="${s.page==="community"?"on":""}">Community</button></span></label>`;
+  h += `<label>Search (title${ex.searchNotes?" + notes":""})<input type="text" data-key="search" value="${esc(s.search)}" placeholder="type and press Enter"></label>`;
+  h += sel("status", [["","Any"],["Want to rent","Want to rent"],["Rented","Rented"],["Watched","Watched"]], "Status", s.status);
+  h += sel("genre", [["","Any"], ...GENRES.map(g=>[g,g])], "Genre", s.genre);
+  h += sel("minRating", [[0,"Any"],[1,"1★ +"],[2,"2★ +"],[3,"3★ +"],[4,"4★ +"],[5,"5★ only"]], "Rating", s.minRating);
+  if (s.page === "library") h += sel("visibility", [["","Any"],["Private","Private"],["Public","Public"],["Shared","Shared"]], "Visibility", s.visibility);
+  if (ex.overdueFilter) h += `<label class="check"><input type="checkbox" data-key="overdueOnly" ${s.overdueOnly?"checked":""}> Overdue only</label>`;
+  if (ex.yearRange) h += `<label>Year from<input type="number" data-key="yearFrom" value="${s.yearFrom||""}"></label><label>Year to<input type="number" data-key="yearTo" value="${s.yearTo||""}"></label>`;
+  h += sel("sort", Object.entries(SORTS), "Sort by", s.sort);
+  h += `<button data-act="clear">Clear filters</button>`;
+  $("controls").innerHTML = h;
+
+  $("experiments").innerHTML = [
+    ["searchNotes","Search box also searches notes"],["overdueFilter","Offer an 'Overdue only' filter"],
+    ["yearRange","Offer a release-year range filter"],["ignoreArticle","Title sort ignores The / A / An"],
+  ].map(([k,t]) => `<label class="check"><input type="checkbox" data-exp="${k}" ${ex[k]?"checked":""}> ${t}</label>`).join("");
+}
+
+const NUM_KEYS = ["minRating","yearFrom","yearTo"];
+document.addEventListener("change", e => {
+  const k = e.target.dataset.key, x = e.target.dataset.exp;
+  if (x) return dispatch({type:"exp",key:x,value:e.target.checked});
+  if (!k) return;
+  let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+  if (NUM_KEYS.includes(k)) v = Number(v) || 0;
+  dispatch({type:"set",key:k,value:v});
+});
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.page) dispatch({type:"set",key:"page",value:t.dataset.page});
+  else if (t.dataset.act === "clear") dispatch({type:"clearFilters"});
+  else if (t.dataset.goto) dispatch({type:"goto",value:Number(t.dataset.goto)});
+  else if (t.dataset.tab) { activeTab = Number(t.dataset.tab); stepIdx = 0; renderScenario(); }
+  else if (t.dataset.step != null) { const i = Number(t.dataset.step); dispatch(SCENARIOS[activeTab].steps[i].action); stepIdx = i + 1; renderScenario(); }
+});
+
+function renderState() {
+  const s = state, p = prev, ex = s.exp;
+  const fields = [
+    ["Signed in as","viewer"],["Page","page", v=>v==="library"?"My Library":"Community"],["Search","search", v=>v?`"${v}"`:"(none)"],
+    ["Status","status", v=>v||"Any"],["Genre","genre", v=>v||"Any"],["Minimum rating","minRating", v=>v?`${v}★ and up`:"Any"],
+    ["Visibility (Library only)","visibility", v=>v||"Any"],["Overdue only","overdueOnly", v=>v?"Yes":"No"],
+    ["Year range","yearFrom", (v)=> ex.yearRange ? `${s.yearFrom||"…"} to ${s.yearTo||"…"}` : "(not offered)"],
+    ["Sort","sort", v=>SORTS[v]],["Page number","pageNum", v=>v],
+  ];
+  const changed = [];
+  $("state").innerHTML = fields.map(([label,key,fmt]) => {
+    const f = fmt || (v=>v); const was = p[key] !== s[key] || (key==="yearFrom" && p.yearTo!==s.yearTo);
+    if (was) changed.push(`${label}: ${esc(f(p[key]))} → <b>${esc(f(s[key]))}</b>`);
+    return `<div class="field ${was?"changed":""}"><b>${label}</b>${esc(f(s[key]))}</div>`;
+  }).join("");
+  Object.keys(ex).forEach(k => { if (p.exp[k] !== ex[k]) changed.push(`Experiment "${k}" → <b>${ex[k]?"on":"off"}</b>`); });
+  $("changed").innerHTML = changed.length ? "<b>What just changed:</b> " + changed.join(" · ") : `<span class="muted">Nothing changed${p===state?"":" (that action wasn't allowed here)"}.</span>`;
+}
+
+function renderResults() {
+  const r = Logic.query(ITEMS, state);
+  const from = r.total ? (r.pageNum-1)*Logic.PER_PAGE+1 : 0, to = Math.min(r.total, r.pageNum*Logic.PER_PAGE);
+  $("summary").innerHTML = `<b>${r.total}</b> match${r.total===1?"":"es"} out of ${r.startCount} on this page before filtering · showing ${from}–${to} · page ${r.pageNum} of ${r.pages} (${Logic.PER_PAGE} per page)`
+    + (state.page==="library" && state.viewer==="anonymous" ? "" : "");
+  $("results").innerHTML = r.rows.length ? r.rows.map(i => `<div class="movie">
+      <div class="t">${esc(i.title)} <span class="muted">(${i.year ?? "no year"})</span></div>
+      <div>${i.genres.map(g=>`<span class="tag">${g}</span>`).join("")}</div>
+      <div>${esc(i.status)}${i.dueAt && i.status==="Rented" ? ` · due ${i.dueAt}` : ""} ${Logic.isOverdue(i)?'<span class="tag over">overdue</span>':""}</div>
+      <div>Rating: ${i.rating ? "★".repeat(i.rating) : '<span class="muted">not rated</span>'}</div>
+      ${i.notes ? `<div class="muted">“${esc(i.notes)}”</div>` : ""}
+      <div class="muted" style="font-size:12px">${i.owner}'s · ${i.visibility}${i.sharedWith.length?" with "+i.sharedWith.join(", "):""} · saved ${i.savedAt}</div>
+    </div>`).join("") : `<p class="muted">No movies match. (The real site would say: "No saved movies match these filters." with a Clear filters link.)</p>`;
+  let pg = `<button data-goto="${r.pageNum-1}" ${r.pageNum<=1?"disabled":""}>‹ Prev</button>`;
+  for (let n=1;n<=r.pages;n++) pg += `<button data-goto="${n}" class="${n===r.pageNum?"on":""}">${n}</button>`;
+  pg += `<button data-goto="${r.pageNum+1}" ${r.pageNum>=r.pages?"disabled":""}>Next ›</button>`;
+  $("pager").innerHTML = pg;
+}
+
+function renderScenario() {
+  $("tabs").innerHTML = SCENARIOS.map((sc,i)=>`<button data-tab="${i}" class="${i===activeTab?"on":""}">${sc.name}</button>`).join("");
+  const sc = SCENARIOS[activeTab];
+  $("scenario").innerHTML = `<div class="why">${sc.text}</div><div class="steps">` +
+    sc.steps.map((st,i)=>`<button data-step="${i}" class="${i<stepIdx?"done":i===stepIdx?"primary":""}" ${i>stepIdx?"disabled":""}>Step ${i+1}: ${st.label}${i<stepIdx?" ✓":""}</button>`).join("") +
+    `</div>${stepIdx>=sc.steps.length?'<p class="muted">Done. Pick another tab, or keep poking in Free play.</p>':""}`;
+}
+
+function render() { renderControls(); renderState(); renderResults(); }
+// Walkthroughs start from a known state: step 1 of each resets first.
+SCENARIOS.forEach(sc => { const a0 = sc.steps[0].action; if (a0.type !== "reset") sc.steps[0].action = {type:"__resetThen", then:a0}; });
+const baseReduce = Logic.reduce;
+Logic.reduce = (s, a) => a.type === "__resetThen" ? baseReduce(baseReduce(s,{type:"reset"}), a.then) : baseReduce(s, a);
+// Scenario 1 starts with a reset that already has a fresh state: run once on load.
+renderScenario(); render();
+</script>
+</body>
+</html>

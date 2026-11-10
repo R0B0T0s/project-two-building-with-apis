@@ -28,6 +28,37 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-09 — Grilled the Movie Rental project idea into a full design, built two throwaway prototypes, wrote the PRD
+
+### Prompts
+1. `/grill-me @project-idea.md`
+2. A, and (i) for preview *(Q1: rental is a simulated status; preview = TMDB poster + overview)*
+3. A, and I agree with one save per movie per user *(Q2: shared `Movie` + per-user `SavedMovie`)*
+4. A + X, and I agree with Private as default *(Q3: per-item visibility + share with specific users)*
+5. a and (i) *(Q4: employee = `is_staff`, admin = `is_superuser`; staff can see everything)*
+6. C, and yes to Genre model *(Q5: send only tmdb_id, reuse fresh Movie else fetch details)*
+7. B *(Q6: My Library + Community pages)*
+8. `/prototype` → chose "Search/filter/sort (logic)" in the follow-up question
+9. ANswer for question 7, add the overdue rentals selection and B *(Q7: field table + Overdue filter; django-filter)*
+10. A and I do agree that tmdb_id can only be set when creating an entry *(Q8: one ModelViewSet at /api/saved/)*
+11. B, and yes to read-only public access *(Q9: session + DRF Token auth)*
+12. B + X. Yes, keep rented_at *(Q10: user picks rental length; free status changes)*
+13. A and X *(Q11: notes = review; optional 1–5 stars)*
+14. A and share usernames publicly *(Q12: built-in auth + sign-up + My Account)*
+15. `/prototype` → chose "Bootstrap 5 (Recommended)" in the follow-up question
+16. A and yes to the about section *(Q13: Bootstrap 5 layout A; About/attribution page)*
+17. A and yes to cleaning up orphaned movies *(Q14: `refresh_movies` command)*
+18. A + X, and the error messages look right *(Q15: server-rendered /find/ page, one-click save)*
+19. A and both X and Y *(Q16: Django test runner + mock.patch + responses)*
+20. A + accounts, and no objection for keeping tmdb_search.py *(Q17: `config` + `rentals` + `accounts`)*
+21. `/to-prd`
+22. Update PROMPTS.md
+
+### Summary
+- **Outcome:** A 17-question grill-me interview settled the whole Movie Rental design: data model, privacy/sharing, roles, the TMDB save flow, browsing, API, auth, rental rules, styling, cache refresh, testing and project layout. Two throwaway prototypes were built in `prototypes/`: `search-filter-sort.html` (a logic playground with 8 guided scenarios, checked with node) and `ui-convention.html` (three Bootstrap 5 layouts with a variant switcher, where layout A was chosen). The decisions were written up as `prd/movie-rental.md` (65 user stories). No application code was written and nothing was committed.
+- **Deviations:** Q4 chose Django's `is_staff` flag over the recommended "Employees" Group. Every other answer matched the recommendation. Several sub-questions went unanswered and the recommended defaults were applied and listed in the PRD (detail page exists, notes searchable, no year range, due-today not overdue, plain A–Z title sort, rental lengths 1/2/7 days, plain Bootstrap edit form; the layout-C form for the detail page was suggested but not explicitly chosen). Both `/prototype` runs needed a follow-up question first: which decision to prototype, and which UI stack to use, since Q13 was still open.
+- **Sideways:** The UI prototype was opened in the browser but never visually checked by the agent, and the user didn't report display issues. No live TMDB request was made this session. The previous session's log says there was no real token, and `.env` was not re-checked.
+
 ## 2026-11-09 — Researched free media/rental APIs; planned and built a TMDB console search script with uv
 
 ### Prompts

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movie Rental UI Directions</title>
+<!-- THROWAWAY UI PROTOTYPE: 3 layout directions for "My Library" in Bootstrap 5. Not production code. Fake data, nothing is saved. -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body { background:#f5f6f8; padding-bottom:90px; }
+  .poster { aspect-ratio:2/3; border-radius:.4rem; display:flex; align-items:flex-end; padding:.5rem; color:#fff; font-weight:600; font-size:.9rem; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+  .poster.sm { width:42px; aspect-ratio:2/3; padding:0; flex:none; }
+  .poster.md { width:120px; flex:none; }
+  .stars { color:#e0a100; letter-spacing:1px; }
+  .sidebar-nav { width:220px; min-height:100vh; }
+  .list-item.active { background:#e7efff; border-left:3px solid #0d6efd; }
+  .list-item { cursor:pointer; border-left:3px solid transparent; }
+  .table td, .table th { vertical-align:middle; }
+  /* prototype switcher: deliberately NOT Bootstrap-styled */
+  #switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:9999; background:#111; color:#fff; font:13px/1.2 ui-monospace, Consolas, monospace;
+    border-radius:999px; padding:6px 8px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 18px rgba(0,0,0,.35); max-width:calc(100vw - 32px); }
+  #switcher button { background:#333; color:#fff; border:0; border-radius:999px; width:30px; height:30px; cursor:pointer; font-size:15px; }
+  #switcher span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="switcher" aria-label="Prototype variant switcher">
+  <button id="prevV" title="Previous (←)">‹</button>
+  <span id="vlabel"></span>
+  <button id="nextV" title="Next (→)">›</button>
+</div>
+
+<script>
+/* ---------- fake data (alice's library; "today" = 2026-11-09) ---------- */
+const TODAY = "2026-11-09";
+const COLORS = ["#3b5bdb","#c2255c","#2b8a3e","#e8590c","#5f3dc4","#0b7285","#862e9c","#a61e4d","#364fc7","#5c940d"];
+let MOVIES = [
+  ["The Matrix",1999,"Action, Sci-Fi","Watched",5,"Still holds up. Lobby scene!","Public","",null],
+  ["Inception",2010,"Action, Sci-Fi","Watched",4,"Confusing ending, rewatch","Public","",null],
+  ["Arrival",2016,"Drama, Sci-Fi","Rented",null,"","Private","","2026-11-09"],
+  ["Toy Story",1995,"Animation, Comedy","Watched",5,"Watched with nephew","Shared","bob",null],
+  ["Alien",1979,"Horror, Sci-Fi","Want to rent",null,"Bob says it's scary","Private","",null],
+  ["A Quiet Place",2018,"Horror, Thriller","Rented",null,"","Private","","2026-11-06"],
+  ["Amélie",2001,"Comedy, Romance","Watched",3,"a bit boring honestly","Public","",null],
+  ["The Godfather",1972,"Drama","Want to rent",null,"","Public","",null],
+  ["Up",2009,"Animation, Drama","Watched",4,"cried in first 10 minutes","Public","",null],
+  ["Heat",1995,"Action, Thriller","Watched",4,"","Private","",null],
+  ["Coco",2017,"Animation","Watched",5,"","Public","",null],
+  ["Get Out",2017,"Horror, Thriller","Watched",4,"","Shared","bob, carol",null],
+  ["Paddington 2",2017,"Comedy, Animation","Want to rent",null,"","Public","",null],
+  ["Blade Runner",1982,"Sci-Fi","Rented",2,"rented again, still slow","Public","","2026-11-12"],
+].map((m,i)=>({id:i+1,title:m[0],year:m[1],genres:m[2],status:m[3],rating:m[4],notes:m[5],visibility:m[6],shared:m[7],due:m[8],
+  overview:"A short TMDB overview of “"+m[0]+"” would appear here, stored locally so it shows even when TMDB is down.", color:COLORS[i%COLORS.length]}));
+
+const ui = { selected: 3, tmdbDown: false, toast: "" };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const stars = r => r ? `<span class="stars">${"★".repeat(r)}<span class="text-body-tertiary">${"★".repeat(5-r)}</span></span>` : `<span class="text-body-secondary small">not rated</span>`;
+const overdue = m => m.status==="Rented" && m.due && m.due < TODAY;
+const statusBadge = m => {
+  const cls = {"Want to rent":"text-bg-secondary","Rented":"text-bg-primary","Watched":"text-bg-success"}[m.status];
+  return `<span class="badge ${cls}">${m.status}</span>` + (overdue(m)?` <span class="badge text-bg-danger">Overdue</span>`:"")
+    + (m.status==="Rented" && !overdue(m) ? ` <span class="small text-body-secondary">due ${m.due}</span>`:"");
+};
+const visIcon = m => ({Private:"🔒 Private",Public:"🌐 Public",Shared:"👥 Shared"})[m.visibility];
+const poster = (m, size="") => `<div class="poster ${size}" style="background:linear-gradient(160deg,${m.color},#111)">${size==="sm"?"":esc(m.title)}</div>`;
+
+const tmdbAlert = () => ui.tmdbDown ? `<div class="alert alert-warning alert-dismissible mb-3" role="alert">
+  <strong>Couldn't reach TMDB.</strong> Movie search is unavailable right now. Your saved movies below still work. Try searching again in a minute.
+  <button type="button" class="btn-close" data-act="tmdbOk"></button></div>` : "";
+const toast = () => ui.toast ? `<div class="alert alert-success py-2 small mb-3">${esc(ui.toast)}</div>` : "";
+const footer = `<footer class="text-center small text-body-secondary py-4 border-top mt-4">Movie Rental · <a href="#">About &amp; credits</a> ·
+  This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>`;
+const searchTmdbBox = (cls="") => `<form class="d-flex gap-2 ${cls}" data-act="tmdbSearch"><input class="form-control form-control-sm" placeholder="Find a movie on TMDB…">
+  <button class="btn btn-sm btn-warning text-nowrap" type="submit">Search TMDB</button></form>`;
+const pager = `<nav class="mt-3"><ul class="pagination pagination-sm justify-content-center mb-0">
+  <li class="page-item disabled"><a class="page-link">Prev</a></li><li class="page-item active"><a class="page-link">1</a></li>
+  <li class="page-item"><a class="page-link" href="#">2</a></li><li class="page-item"><a class="page-link" href="#">Next</a></li></ul></nav>`;
+const filterFields = (layout) => `
+  <input class="form-control form-control-sm" placeholder="Search title or notes">
+  <select class="form-select form-select-sm"><option>Any status</option><option>Want to rent</option><option>Rented</option><option>Watched</option></select>
+  <select class="form-select form-select-sm"><option>Any genre</option><option>Action</option><option>Animation</option><option>Comedy</option><option>Drama</option><option>Horror</option><option>Sci-Fi</option></select>
+  <select class="form-select form-select-sm"><option>Any rating</option><option>3★ and up</option><option>4★ and up</option><option>5★ only</option></select>
+  <select class="form-select form-select-sm"><option>Any visibility</option><option>Private</option><option>Public</option><option>Shared</option></select>
+  <div class="form-check ${layout==="row"?"mb-0 align-self-center text-nowrap":""}"><input class="form-check-input" type="checkbox" id="od${layout}"><label class="form-check-label small" for="od${layout}">Overdue only</label></div>
+  <select class="form-select form-select-sm"><option>Sort: Date saved (newest)</option><option>Title A–Z</option><option>Release year</option><option>My rating</option></select>`;
+
+/* ===== Variant A: Poster shelf — top navbar, filter sidebar, poster card grid ===== */
+function variantA() {
+  return `
+  <nav class="navbar navbar-expand bg-dark navbar-dark"><div class="container">
+    <a class="navbar-brand fw-bold" href="#">🎬 Movie Rental</a>
+    <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link active" href="#">My Library</a></li><li class="nav-item"><a class="nav-link" href="#">Community</a></li></ul>
+    <div class="d-none d-md-block me-3" style="width:320px">${searchTmdbBox()}</div>
+    <span class="navbar-text small">alice · <a href="#" class="link-light">Log out</a></span></div></nav>
+  <div class="container py-4">
+    ${tmdbAlert()}${toast()}
+    <div class="d-md-none mb-3">${searchTmdbBox()}</div>
+    <div class="row g-4">
+      <aside class="col-md-3"><div class="card"><div class="card-body d-grid gap-2"><h6 class="card-title mb-1">Filter your library</h6>${filterFields("col")}
+        <button class="btn btn-sm btn-primary">Apply</button><a class="small text-center" href="#">Clear filters</a></div></div></aside>
+      <section class="col-md-9">
+        <div class="d-flex justify-content-between align-items-baseline mb-2"><h4 class="mb-0">My Library</h4><span class="text-body-secondary small">14 movies · page 1 of 2</span></div>
+        <div class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 g-3">
+          ${MOVIES.slice(0,12).map(m=>`<div class="col"><div class="card h-100 shadow-sm">
+            <div class="p-2 pb-0">${poster(m)}</div>
+            <div class="card-body p-2"><div class="fw-semibold small">${esc(m.title)} <span class="text-body-secondary fw-normal">(${m.year})</span></div>
+              <div class="small">${statusBadge(m)}</div><div class="small">${stars(m.rating)}</div>
+              <div class="small text-body-secondary">${visIcon(m)}</div></div>
+            <div class="card-footer bg-transparent p-2 d-flex gap-1">${m.status==="Rented"?`<button class="btn btn-sm btn-outline-success flex-fill" data-act="watched" data-id="${m.id}">Mark watched</button>`:`<button class="btn btn-sm btn-outline-primary flex-fill" data-act="rent" data-id="${m.id}">Rent (2 days)</button>`}
+              <button class="btn btn-sm btn-outline-secondary">Edit</button></div></div></div>`).join("")}
+        </div>${pager}
+      </section></div>${footer}</div>`;
+}
+
+/* ===== Variant B: Rental desk — left sidebar nav, dense sortable table, filter toolbar ===== */
+function variantB() {
+  const counts = s => MOVIES.filter(m=>m.status===s).length;
+  return `<div class="d-flex flex-column flex-md-row">
+  <nav class="sidebar-nav bg-white border-end p-3 d-none d-md-block">
+    <div class="fw-bold mb-3">🎬 Movie Rental</div>
+    <div class="nav flex-column nav-pills small gap-1">
+      <a class="nav-link active" href="#">My Library <span class="badge text-bg-light float-end">${MOVIES.length}</span></a>
+      <a class="nav-link" href="#">↳ Want to rent <span class="float-end">${counts("Want to rent")}</span></a>
+      <a class="nav-link" href="#">↳ Rented <span class="float-end">${counts("Rented")}</span></a>
+      <a class="nav-link" href="#">↳ Watched <span class="float-end">${counts("Watched")}</span></a>
+      <a class="nav-link text-danger" href="#">↳ Overdue <span class="float-end">${MOVIES.filter(overdue).length}</span></a>
+      <hr class="my-2"><a class="nav-link" href="#">Community</a><a class="nav-link" href="#">Find movies (TMDB)</a><a class="nav-link" href="#">My account</a><a class="nav-link" href="#">About</a>
+    </div><div class="small text-body-secondary mt-4">Signed in as alice</div></nav>
+  <nav class="navbar bg-white border-bottom d-md-none px-3"><span class="fw-bold">🎬 Movie Rental</span><select class="form-select form-select-sm w-auto"><option>My Library</option><option>Community</option><option>Find movies</option></select></nav>
+  <main class="flex-fill p-3 p-md-4" style="min-width:0">
+    ${tmdbAlert()}${toast()}
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><h4 class="mb-0">My Library</h4><div style="min-width:280px">${searchTmdbBox()}</div></div>
+    <div class="card mb-3"><div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center filter-row">${filterFields("row")}<button class="btn btn-sm btn-primary">Apply</button></div></div>
+    <div class="card"><div class="table-responsive"><table class="table table-hover table-sm mb-0">
+      <thead class="table-light"><tr><th></th><th>Title ▲</th><th>Year</th><th>Status</th><th>My rating</th><th>Visibility</th><th>Notes</th><th class="text-end">Actions</th></tr></thead>
+      <tbody>${MOVIES.slice(0,12).map(m=>`<tr>
+        <td>${poster(m,"sm")}</td><td class="fw-semibold">${esc(m.title)}<div class="small text-body-secondary fw-normal">${esc(m.genres)}</div></td><td>${m.year}</td>
+        <td>${statusBadge(m)}</td><td>${stars(m.rating)}</td><td class="small text-nowrap">${visIcon(m)}${m.shared?`<div class="text-body-secondary">${esc(m.shared)}</div>`:""}</td>
+        <td class="small text-body-secondary text-truncate" style="max-width:180px">${esc(m.notes)||"—"}</td>
+        <td class="text-end text-nowrap"><div class="btn-group btn-group-sm">${m.status==="Rented"?`<button class="btn btn-outline-success" data-act="watched" data-id="${m.id}">Watched</button>`:`<button class="btn btn-outline-primary" data-act="rent" data-id="${m.id}">Rent</button>`}
+          <button class="btn btn-outline-secondary">Edit</button><button class="btn btn-outline-danger">Delete</button></div></td></tr>`).join("")}</tbody></table></div>
+      <div class="card-footer bg-white d-flex justify-content-between align-items-center small"><span class="text-body-secondary">Showing 1–12 of 14</span>${pager.replace('mt-3','')}</div></div>
+    ${footer}</main></div>`;
+}
+
+/* ===== Variant C: List + detail — compact list on the left, full record and edit form on the right ===== */
+function variantC() {
+  const m = MOVIES.find(x=>x.id===ui.selected) || MOVIES[0];
+  return `
+  <nav class="navbar navbar-expand bg-primary navbar-dark"><div class="container-fluid px-3 px-lg-4">
+    <a class="navbar-brand fw-bold" href="#">🎬 Movie Rental</a>
+    <div class="btn-group btn-group-sm me-auto"><button class="btn btn-light">My Library</button><button class="btn btn-outline-light">Community</button></div>
+    <button class="btn btn-warning btn-sm me-2" data-act="tmdbSearch">+ Add from TMDB</button><span class="navbar-text small d-none d-sm-inline">alice</span></div></nav>
+  <div class="container-fluid px-3 px-lg-4 py-3">
+    ${tmdbAlert()}${toast()}
+    <div class="row g-3">
+      <section class="col-lg-4"><div class="card">
+        <div class="card-header bg-white"><input class="form-control form-control-sm mb-2" placeholder="Search title or notes">
+          <div class="d-flex flex-wrap gap-1">${["All","Want to rent","Rented","Watched","Overdue"].map((s,i)=>`<button class="btn btn-sm ${i===0?"btn-dark":"btn-outline-secondary"}">${s}</button>`).join("")}</div>
+          <details class="small mt-2"><summary class="text-body-secondary">More filters &amp; sort</summary><div class="d-grid gap-2 mt-2">${filterFields("col")}</div></details></div>
+        <div class="list-group list-group-flush" style="max-height:70vh;overflow:auto">
+          ${MOVIES.slice(0,12).map(x=>`<div class="list-group-item list-item d-flex gap-2 align-items-center ${x.id===m.id?"active":""}" data-act="select" data-id="${x.id}">
+            ${poster(x,"sm")}<div class="flex-fill" style="min-width:0"><div class="fw-semibold small text-truncate">${esc(x.title)} <span class="text-body-secondary fw-normal">${x.year}</span></div>
+            <div class="small">${statusBadge(x)}</div></div><div class="small">${x.rating?`<span class="stars">★${x.rating}</span>`:""}</div></div>`).join("")}
+        </div><div class="card-footer bg-white">${pager.replace('mt-3','')}</div></div></section>
+      <section class="col-lg-8"><div class="card"><div class="card-body">
+        <div class="d-flex gap-3 flex-column flex-sm-row">${poster(m,"md")}
+          <div class="flex-fill"><h4 class="mb-0">${esc(m.title)} <span class="text-body-secondary fw-normal">(${m.year})</span></h4>
+            <div class="small text-body-secondary mb-2">${esc(m.genres)}</div><div class="mb-2">${statusBadge(m)}</div>
+            <p class="small mb-0">${esc(m.overview)}</p></div></div>
+        <hr><h6>Your rental &amp; review</h6>
+        <form class="row g-3" data-act="saveForm">
+          <div class="col-sm-4"><label class="form-label small">Status</label><select class="form-select form-select-sm" name="status">${["Want to rent","Rented","Watched"].map(s=>`<option ${s===m.status?"selected":""}>${s}</option>`).join("")}</select></div>
+          <div class="col-sm-4"><label class="form-label small">Rental length (when renting)</label><select class="form-select form-select-sm" name="days"><option value="1">1 day</option><option value="2" selected>2 days</option><option value="7">7 days</option></select></div>
+          <div class="col-sm-4"><label class="form-label small">My rating</label><select class="form-select form-select-sm" name="rating"><option value="">Not rated</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${r===m.rating?"selected":""}>${"★".repeat(r)}</option>`).join("")}</select></div>
+          <div class="col-12"><label class="form-label small">Notes / review</label><textarea class="form-control form-control-sm" rows="3" name="notes">${esc(m.notes)}</textarea></div>
+          <div class="col-sm-6"><label class="form-label small">Who can see this?</label><select class="form-select form-select-sm" name="vis">${["Private","Public","Shared"].map(v=>`<option ${v===m.visibility?"selected":""}>${v}</option>`).join("")}</select>
+            <div class="form-text">Private is the default. Staff can see all items for support.</div></div>
+          <div class="col-sm-6"><label class="form-label small">Share with (usernames)</label><input class="form-control form-control-sm" name="shared" value="${esc(m.shared)}" placeholder="e.g. bob, carol"></div>
+          <div class="col-12 d-flex gap-2"><button class="btn btn-primary btn-sm" type="submit">Save changes</button><button class="btn btn-outline-danger btn-sm ms-auto" type="button">Remove from library</button></div>
+        </form></div></div></section>
+    </div>${footer}</div>`;
+}
+
+/* ---------- variant switcher + stub interactions ---------- */
+const VARIANTS = [["A","Poster shelf (navbar + filter sidebar + poster grid)",variantA],["B","Rental desk (sidebar nav + dense table)",variantB],["C","List + detail (compact list, inline edit form)",variantC]];
+let vi = 0; try { vi = Math.max(0, Math.min(2, Number(localStorage.getItem("mr-variant")) || 0)); } catch (e) {}
+function render() {
+  document.getElementById("app").innerHTML = VARIANTS[vi][2]();
+  document.getElementById("vlabel").textContent = `${VARIANTS[vi][0]} · ${VARIANTS[vi][1]} · ${vi+1}/3`;
+  try { localStorage.setItem("mr-variant", vi); } catch (e) {}
+}
+const go = d => { vi = (vi + d + 3) % 3; ui.toast = ""; render(); window.scrollTo(0,0); };
+document.getElementById("prevV").onclick = () => go(-1);
+document.getElementById("nextV").onclick = () => go(1);
+document.addEventListener("keydown", e => { if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; if (e.key==="ArrowLeft") go(-1); if (e.key==="ArrowRight") go(1); });
+const addDays = n => { const d = new Date(TODAY+"T12:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]"); if (!t || t.tagName==="FORM") return;
+  const m = MOVIES.find(x=>x.id===Number(t.dataset.id));
+  switch (t.dataset.act) {
+    case "select": ui.selected = m.id; ui.toast = ""; break;
+    case "rent": m.status="Rented"; m.due=addDays(2); ui.toast=`Rented “${m.title}” for 2 days, due ${m.due}. (Prototype only: nothing is saved.)`; break;
+    case "watched": m.status="Watched"; m.due=null; ui.toast=`Marked “${m.title}” as watched.`; break;
+    case "tmdbSearch": ui.tmdbDown = true; ui.toast=""; break;
+    case "tmdbOk": ui.tmdbDown = false; break;
+    default: return;
+  }
+  render();
+});
+document.addEventListener("submit", e => {
+  e.preventDefault(); const f = e.target;
+  if (f.dataset.act === "tmdbSearch") { ui.tmdbDown = true; ui.toast = ""; return render(); }
+  if (f.dataset.act === "saveForm") {
+    const m = MOVIES.find(x=>x.id===ui.selected), d = Object.fromEntries(new FormData(f));
+    if (d.status==="Rented" && m.status!=="Rented") m.due = addDays(Number(d.days)); if (d.status!=="Rented") m.due = null;
+    Object.assign(m, {status:d.status, rating:d.rating?Number(d.rating):null, notes:d.notes, visibility:d.vis, shared:d.shared});
+    ui.toast = `Saved changes to “${m.title}”.` + (m.due?` Due ${m.due}.`:""); render();
+  }
+});
+render();
+</script>
+</body>
+</html>
