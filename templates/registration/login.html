@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Log in · Movie Rental{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 card-title mb-3">Log in</h1>
+
+        {% if next and user.is_authenticated %}
+          <div class="alert alert-warning small">You don't have access to that page.</div>
+        {% elif next %}
+          <div class="alert alert-info small">Please log in to see that page.</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'accounts:login' %}" novalidate>
+          {% csrf_token %}
+          {% include "includes/form_errors.html" %}
+          {% include "includes/form_field.html" with field=form.username %}
+          {% include "includes/form_field.html" with field=form.password %}
+          <input type="hidden" name="next" value="{{ next }}">
+          <button type="submit" class="btn btn-primary w-100">Log in</button>
+        </form>
+
+        <p class="small text-center mt-3 mb-0">
+          New here? <a href="{% url 'accounts:signup' %}">Sign up</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

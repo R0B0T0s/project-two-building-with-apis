@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}My Account · Movie Rental{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 card-title mb-1">My Account</h1>
+        <p class="text-body-secondary small mb-3">
+          Signed in as <strong>{{ user.username }}</strong>. Your username is shown publicly;
+          your name and email are not.
+        </p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% include "includes/form_errors.html" %}
+          <div class="row">
+            <div class="col-sm-6">{% include "includes/form_field.html" with field=form.first_name %}</div>
+            <div class="col-sm-6">{% include "includes/form_field.html" with field=form.last_name %}</div>
+          </div>
+          {% include "includes/form_field.html" with field=form.email %}
+          <button type="submit" class="btn btn-primary">Save changes</button>
+          <a href="{% url 'accounts:password_change' %}" class="btn btn-outline-secondary ms-2">Change password</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

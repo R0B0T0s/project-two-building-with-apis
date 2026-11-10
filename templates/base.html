@@ -25,7 +25,20 @@
                  placeholder="Search TMDB for movies…" aria-label="Search TMDB for movies">
           <button class="btn btn-sm btn-warning" type="submit">Search</button>
         </form>
-        <span class="navbar-text small"><a href="#" class="link-light">Log in</a></span>
+        {% if user.is_authenticated %}
+          <div class="d-flex align-items-center gap-2" data-testid="nav-account">
+            <a class="nav-link link-light small" href="{% url 'accounts:my_account' %}">👤 {{ user.username }}</a>
+            <form method="post" action="{% url 'accounts:logout' %}" class="m-0">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-light">Log out</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="d-flex align-items-center gap-2" data-testid="nav-account">
+            <a class="nav-link link-light small" href="{% url 'accounts:login' %}">Log in</a>
+            <a class="btn btn-sm btn-outline-light" href="{% url 'accounts:signup' %}">Sign up</a>
+          </div>
+        {% endif %}
       </div>
     </div>
   </nav>

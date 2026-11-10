@@ -28,6 +28,23 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Implemented Phase 2: Accounts (sign-up, login/logout, password change, My Account, navbar)
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 2`
+2. Yes, approve all three *(TDD behaviors: sign-up creates an account and signs in; My Account requires login; My Account saves name and email)*
+3. I approve *(cycle 1 RED: sign-up creates the user, signs them in and redirects home)*
+4. Yes, move on to cycle 2
+5. Yes, approve the test *(cycle 2 RED: signed-out visitor to My Account is redirected to login with `?next=`)*
+6. Yes, move on to cycle 3
+7. Yes, approve the test *(cycle 3: saving My Account changes only first name, last name and email)*
+8. Manual verification has passed
+
+### Summary
+- **Outcome:** Added `accounts/urls.py` (namespaced `accounts`: `signup`, `my_account` at `/accounts/me/`, and Django's built-in `login`, `logout`, `password_change`, `password_change_done`), `accounts/forms.py` (`AccountForm`: first name, last name, email) and `accounts/views.py` (`SignUpView` logs the new user in; `MyAccountView` is `LoginRequiredMixin` + `UpdateView` on `request.user` with a success message). Settings got `LOGIN_URL`, `LOGIN_REDIRECT_URL` and `LOGOUT_REDIRECT_URL`. Templates: sign-up (with the "Your username is shown publicly." warning), login, password change and done, My Account, plus reusable hand-rendered Bootstrap includes `includes/form_field.html` and `includes/form_errors.html`. The navbar now shows Log in / Sign up when signed out and 👤 username (My Account link) plus a POST Log out button when signed in. `accounts/tests.py` has 15 tests (3 TDD + 12 ordinary for the warning, failed sign-up, login, wrong password, `next`, logout, password change, navbar states, prefill and invalid email). All 18 tests, Ruff lint and format pass.
+- **Deviations:** None from the user. Choices made without an explicit question: sign-up and login both land on the home page (no My Library yet); My Account lives at `/accounts/me/`; logout is a POST form because Django's `LogoutView` no longer accepts GET; no logout template, since logout redirects home.
+- **Sideways:** Cycle 1's first run errored with a `KeyError` on the session instead of failing an assertion; the test was changed to `session.get(...)` before approval. Cycle 2 first crashed (`AnonymousUser` has no `_meta`) and lacked a login template; the template was built and the test class set `raise_request_exception = False` so the 500 became an assertion failure, which was disclosed and approved. Cycle 3 was never RED: the `UpdateView` and `AccountForm` scaffolding built for cycle 2 already implemented it. To show the test could fail, the form was broken twice on purpose (dropping `email`; adding `username` and `is_staff`), each break failed the test, and the form was restored. The TMDB logo file from Phase 1 is still missing.
+
 ## 2026-11-10 — Implemented Phase 1: Django skeleton, layout A base template and About page
 
 ### Prompts

@@ -1,0 +1,19 @@
+{# Renders one form field by hand with Bootstrap 5 classes. Usage: include with field=form.x #}
+<div class="mb-3">
+  <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+  <input type="{{ field.field.widget.input_type|default:'text' }}"
+         name="{{ field.html_name }}"
+         id="{{ field.id_for_label }}"
+         class="form-control{% if field.errors %} is-invalid{% endif %}"
+         {% if field.value is not None and field.field.widget.input_type != 'password' %}value="{{ field.value }}"{% endif %}
+         {% if field.field.required %}required{% endif %}
+         {% if field.field.widget.attrs.autocomplete %}autocomplete="{{ field.field.widget.attrs.autocomplete }}"{% endif %}
+         {% if field.field.widget.attrs.autofocus %}autofocus{% endif %}
+         {% if field.field.max_length %}maxlength="{{ field.field.max_length }}"{% endif %}>
+  {% for error in field.errors %}
+    <div class="invalid-feedback">{{ error }}</div>
+  {% endfor %}
+  {% if field.help_text %}
+    <div class="form-text small">{{ field.help_text|safe }}</div>
+  {% endif %}
+</div>
