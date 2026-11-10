@@ -3,6 +3,26 @@ name = "project-two-building-with-apis"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+    "django>=6.1.3",
+    "django-filter>=26.2",
+    "djangorestframework>=3.18.3",
     "python-dotenv>=1.2.4",
     "requests>=2.34.2",
 ]
+
+[dependency-groups]
+dev = [
+    "responses>=0.26.3",
+    "ruff>=0.17.4",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I isort, B bugbear, UP pyupgrade, DJ flake8-django
+select = ["E", "W", "F", "I", "B", "UP", "DJ"]
+# Line length is enforced by `ruff format`; long strings it cannot wrap are allowed.
+ignore = ["E501"]

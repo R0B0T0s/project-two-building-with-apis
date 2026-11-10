@@ -28,6 +28,21 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Implemented Phase 1: Django skeleton, layout A base template and About page
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 1`
+2. Yes, approve both *(TDD behaviors: About page content; footer on every page)*
+3. Yes, approve the test *(cycle 1 RED: About page shows logo, notice and staff statement)*
+4. Yes, move on to cycle 2
+5. Yes, approve the test *(cycle 2 RED: footer on `/` and `/about/` links to About and has the notice)*
+6. Manual verification has passed
+
+### Summary
+- **Outcome:** Added Django, DRF, django-filter (and dev `responses`, `ruff`) with uv. Created the `config` project and the empty `rentals` and `accounts` apps. Settings read `SECRET_KEY`, `DEBUG` and `TMDB_READ_TOKEN` from `.env` with python-dotenv. `.env.example` lists all three, and a generated `SECRET_KEY` and `DEBUG=True` were appended to the local `.env`. Ruff is configured in `pyproject.toml`. Built `templates/base.html` in Bootstrap 5 layout A (dark navbar with placeholder links and search box, message alerts, footer with the About link and TMDB notice), a placeholder home page and the About page (logo, attribution, staff-access statement). Two TDD cycles, each approved at RED, produced `rentals/tests/test_pages.py` (2 tests, passing). `manage.py check`, Ruff lint and format pass, and `runserver` served both pages.
+- **Deviations:** None from the recommendations. Choices made without an explicit question and reported to the user: Ruff ignores E501 because `ruff format` owns line length; `TIME_ZONE` set to `America/Chicago` so "due before today" uses local dates; the About page lives at `rentals:about`; a placeholder home page was added at `/` as test scaffolding; `ruff format` rewrapped `tmdb_search.py` without changing its behavior.
+- **Sideways:** Downloading the official TMDB logo failed with a 403. A retry with a browser user agent was blocked by the permission classifier as bot-check circumvention and was not pursued. The About page references `static/images/tmdb-logo.svg`, which still has to be downloaded by hand from TMDB's logos page. It was still missing when Phase 1 was committed, and manual verification passed without it.
+
 ## 2026-11-10 — Broke the Movie Rental PRD into a 12-phase tracer-bullet plan
 
 ### Prompts

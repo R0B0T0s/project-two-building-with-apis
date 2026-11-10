@@ -49,7 +49,9 @@ def search_movies(session, phrase):
         return None
 
     if response.status_code == 401:
-        print("TMDB rejected the token - check it's the Read Access Token, not the API Key.")
+        print(
+            "TMDB rejected the token - check it's the Read Access Token, not the API Key."
+        )
         return None
     if response.status_code == 429:
         print("Rate limited by TMDB - wait a moment and try again.")
@@ -79,7 +81,9 @@ def show_results(phrase, movies):
     for number, movie in enumerate(movies[:MAX_RESULTS], start=1):
         year = (movie.get("release_date") or "")[:4] or "n/a"
         rating = movie.get("vote_average") or 0
-        print(f"{number}. {movie.get('title', '?')} ({year})  ★ {rating:.1f}  [id {movie.get('id')}]")
+        print(
+            f"{number}. {movie.get('title', '?')} ({year})  ★ {rating:.1f}  [id {movie.get('id')}]"
+        )
         overview = movie.get("overview") or "(no overview)"
         if len(overview) > OVERVIEW_LENGTH:
             overview = overview[:OVERVIEW_LENGTH].rstrip() + "..."
@@ -92,13 +96,15 @@ def main():
     sys.stdout.reconfigure(errors="replace")
     token = load_token()
     session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {token}", "Accept": "application/json"})
+    session.headers.update(
+        {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    )
 
     print("TMDB movie search. Press Enter on a blank line to quit.")
     while True:
         try:
             phrase = input("\nSearch movies: ").strip()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             print()
             break
         if not phrase:

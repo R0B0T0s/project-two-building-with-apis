@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}About · Movie Rental{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-4">About Movie Rental</h1>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h2 class="h5 card-title">Movie data from TMDB</h2>
+        <img src="{% static 'images/tmdb-logo.svg' %}" alt="TMDB logo" height="40" class="my-3">
+        <p class="mb-2">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <p class="small text-body-secondary mb-0">
+          Movie titles, overviews, posters and genres come from
+          <a href="https://www.themoviedb.org/">The Movie Database (TMDB)</a>.
+          Renting here is simulated: no payments are taken and no movies are streamed.
+        </p>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 card-title">Who can see your data</h2>
+        <p>Employees and admins can see all data, including Private movies and notes, so that they can support users.</p>
+        <p class="small text-body-secondary mb-0">
+          Every movie you save is Private by default. You can make it Public, so anyone can see it,
+          or Shared with specific usernames. Usernames are shown publicly.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
