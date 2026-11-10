@@ -28,6 +28,18 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Broke the Movie Rental PRD into a 12-phase tracer-bullet plan
+
+### Prompts
+1. `/prd-to-plan @prd/movie-rental.md`
+2. Lets merge Phases 6 and 7, Place phase 11 into Phase 4. Everything else looks good.
+3. Update prompts.md
+
+### Summary
+- **Outcome:** Wrote `plans/movie-rental.md`. It has a durable architectural-decisions header (the `config` project, the `rentals` and `accounts` apps, the Genre/Movie/SavedMovie models, the staff helper, `visible_to`, the TMDB service module, URLs, UI, testing) and 12 vertical-slice phases. Each phase has its user stories, what to build and acceptance criteria, and all 65 PRD stories are covered. No application code was written and nothing was committed.
+- **Deviations:** The first breakdown had 14 phases. The user merged "Edit and delete (rating and notes)" with "Rental rules and overdue" into one phase (now Phase 6) and folded the Django admin phase into the save phase (now Phase 4). The suggested order, with privacy before Community and filters after both list pages, was accepted unchanged.
+- **Sideways:** Nothing went wrong. The plan was written straight from the approved breakdown and was not reviewed again afterward.
+
 ## 2026-11-09 — Grilled the Movie Rental project idea into a full design, built two throwaway prototypes, wrote the PRD
 
 ### Prompts
