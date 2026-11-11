@@ -1,9 +1,15 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 
 from .permissions import is_staff_user
+
+RENTAL_DAY_CHOICES = [(1, "1 day"), (2, "2 days"), (7, "7 days")]
+DEFAULT_RENTAL_DAYS = 2
 
 
 class Genre(models.Model):
@@ -66,6 +72,14 @@ class SavedMovieQuerySet(models.QuerySet):
         )
         return self.filter(models.Q(owner=user) | public | shared_with_user)
 
+    def editable_by(self, user):
+        """Entries ``user`` may edit or delete: the owner and staff only."""
+        if is_staff_user(user):
+            return self.all()
+        if not user or not user.is_authenticated:
+            return self.none()
+        return self.filter(owner=user)
+
 
 class SavedMovie(models.Model):
     """A movie in one user's library."""
@@ -125,6 +139,48 @@ class SavedMovie(models.Model):
 
     def get_absolute_url(self):
         return reverse("rentals:saved_detail", args=[self.pk])
+
+    def change_status(self, status, rental_days=DEFAULT_RENTAL_DAYS):
+        """Apply the rental rules for a status change (does not save).
+
+        Setting Rented (again) starts a fresh rental of ``rental_days`` days.
+        Any other status ends the rental: ``due_at`` is cleared and
+        ``rented_at`` is kept as "last rented" history.
+        """
+        self.status = status
+        if status == self.Status.RENTED:
+            self.rented_at = timezone.now()
+            self.due_at = self.rented_at + timedelta(days=int(rental_days))
+        else:
+            self.due_at = None
+
+    @property
+    def rental_days(self):
+        """Length of the current rental in whole days, or None if not rented."""
+        if self.status != self.Status.RENTED or not (self.rented_at and self.due_at):
+            return None
+        return (self.due_at - self.rented_at).days
+
+    def change_rental_length(self, rental_days):
+        """Fix the length of the current rental, keeping its start date."""
+        if self.status == self.Status.RENTED and self.rented_at:
+            self.due_at = self.rented_at + timedelta(days=int(rental_days))
+
+    def can_edit(self, user):
+        """True for the owner and staff (same rule as ``editable_by``)."""
+        return bool(
+            is_staff_user(user)
+            or (user and user.is_authenticated and user.pk == self.owner_id)
+        )
+
+    @property
+    def is_overdue(self):
+        """Rented and due before today. A rental due today is not overdue."""
+        return bool(
+            self.status == self.Status.RENTED
+            and self.due_at
+            and timezone.localdate(self.due_at) < timezone.localdate()
+        )
 
     @property
     def stars(self):

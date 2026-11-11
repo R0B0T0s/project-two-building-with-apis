@@ -28,6 +28,25 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Implemented Phase 6: edit, delete, rental rules, overdue and one-click card actions
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 6`
+2. I approve *(TDD behaviors: rental rules on rent/leave/re-rent; overdue only when due before today; owner-and-staff-only edit and delete)*
+3. Go ahead *(cycle 1 RED: `change_status` sets `rented_at`/`due_at` from the length, clears `due_at` but keeps `rented_at` on leaving Rented, re-rent starts a new 2-day period)*
+4. Move on
+5. Go ahead *(cycle 2 RED: six overdue cases with "now" frozen at 8 am Nov 10 Chicago time, including due earlier today and due yesterday evening)*
+6. Move on
+7. Go ahead *(cycle 3 RED: another user gets 404 on edit/delete of a Public entry; owner, employee and admin allowed; signed-out sent to login)*
+8. Go ahead *(finish the rest of the phase normally)*
+9. Everything but step 3 works.
+10. Step 3 works now. Manual verification has passed
+
+### Summary
+- **Outcome:** Added the rental rules to `SavedMovie` so the API can reuse them: `change_status()` (Rented starts a fresh rental of 1/2/7 days; any other status clears `due_at` and keeps `rented_at`), `change_rental_length()` (moves the due date of a current rental and keeps its start), `rental_days`, a calculated `is_overdue` (compares local dates, so due today isn't overdue), `can_edit()`, and an `editable_by(user)` queryset (owner or staff). Added `rentals/forms.py` with `SavedMovieForm` (status, rental length, rating as empty or 1–5, notes). It starts a new rental only on an actual status change, so a notes-only edit keeps the due date. New pages: edit at `/saved/<id>/edit/` and delete confirmation at `/saved/<id>/delete/`. One-click POST actions Rent (2 days) and Mark watched (`/saved/<id>/rent/`, `/saved/<id>/watched/`) return to My Library. All four views use `editable_by`, so anyone else gets a 404 and signed-out visitors go to login. The detail page shows Edit/Delete only to the owner and staff, plus an Overdue badge, the due date with its time, and "Last rented". Cards use a shared `rental_badges.html` include (status, "Due Nov 12" or Overdue) and have a footer with the actions and an Edit link, raised above the title's stretched link. Three TDD cycles, each approved at RED, plus normal tests for rating validation at every status, rental-length validation, the chosen length on the edit page, card actions (POST-only, owner-only), the Overdue badge and the detail-page controls. 70 tests pass. Ruff lint and format and `makemigrations --check` are clean.
+- **Deviations:** None. Every recommendation was accepted. A 404, not a 403, is used for users who can't edit (the plan allowed either) so Private entries aren't revealed. Visibility and shared-with stay out of the edit form until Phase 7, as planned.
+- **Sideways:** Manual verification step 3 failed. Changing the rental length of a movie that was already Rented was silently ignored, because the form only applied the length on a status change, and the length dropdown always showed "2 days". It was reproduced with a scratch Django test-client script, then fixed test-first: a new test failed `2 != 7`, then `change_rental_length()` was added and the form now opens on the current length. That fix broke one earlier test from this phase, whose "notes-only" edit sent a different length than the rental had (a browser never does). The test data was corrected to send the current length. In cycle 3, the test first used the wrong login URL name (`login` instead of `accounts:login`), a mechanical fix noted at RED. The signed-out access test passed before the fix because `@login_required` was already in place, which was disclosed at RED. The first repro attempt was piped into `manage.py shell` and broke on the console's multi-line parsing, so it was rerun with `shell -c exec(...)`. Every `uv run` warned about the unrelated active `django-test` virtualenv (harmless).
+
 ## 2026-11-10 — Implemented Phase 5: My Library grid, full detail page and `visible_to`
 
 ### Prompts

@@ -1,0 +1,8 @@
+{# Status badge plus an Overdue badge or the due date. Expects `saved`. #}
+<span class="badge {% if saved.status == 'rented' %}text-bg-primary{% elif saved.status == 'watched' %}text-bg-success{% else %}text-bg-secondary{% endif %}" data-testid="status-badge">{{ saved.get_status_display }}</span>
+{% if saved.is_overdue %}
+  <span class="badge text-bg-danger" data-testid="overdue-badge">Overdue</span>
+  <span class="small text-danger">since {{ saved.due_at|date:"M j" }}</span>
+{% elif saved.status == 'rented' and saved.due_at %}
+  <span class="small text-body-secondary" data-testid="due-on">Due {{ saved.due_at|date:"M j" }}</span>
+{% endif %}

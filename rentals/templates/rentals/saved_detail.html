@@ -29,10 +29,14 @@
           <dt class="col-sm-4 col-lg-3">Status</dt>
           <dd class="col-sm-8 col-lg-9" data-testid="status">
             <span class="badge {% if saved.status == 'rented' %}text-bg-primary{% elif saved.status == 'watched' %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ saved.get_status_display }}</span>
+            {% if saved.is_overdue %}<span class="badge text-bg-danger" data-testid="overdue-badge">Overdue</span>{% endif %}
           </dd>
 
           <dt class="col-sm-4 col-lg-3">Due date</dt>
-          <dd class="col-sm-8 col-lg-9" data-testid="due-date">{% if saved.due_at %}{{ saved.due_at|date:"M j, Y" }}{% else %}<span class="text-body-secondary">Not rented</span>{% endif %}</dd>
+          <dd class="col-sm-8 col-lg-9" data-testid="due-date">{% if saved.due_at %}<span{% if saved.is_overdue %} class="text-danger"{% endif %}>{{ saved.due_at|date:"M j, Y, g:i a" }}</span>{% else %}<span class="text-body-secondary">Not rented</span>{% endif %}</dd>
+
+          <dt class="col-sm-4 col-lg-3">Last rented</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="last-rented">{% if saved.rented_at %}{{ saved.rented_at|date:"M j, Y" }}{% else %}<span class="text-body-secondary">Never</span>{% endif %}</dd>
 
           <dt class="col-sm-4 col-lg-3">Your rating</dt>
           <dd class="col-sm-8 col-lg-9" data-testid="rating">{% if saved.stars %}<span class="text-warning" aria-label="Rated {{ saved.rating }} out of 5">{{ saved.stars }}</span>{% else %}<span class="text-body-secondary">Not rated</span>{% endif %}</dd>
@@ -46,6 +50,13 @@
           <dt class="col-sm-4 col-lg-3">Visibility</dt>
           <dd class="col-sm-8 col-lg-9" data-testid="visibility">{{ saved.get_visibility_display }}</dd>
         </dl>
+
+        {% if can_edit %}
+          <div class="mt-3 d-flex gap-2" data-testid="owner-controls">
+            <a href="{% url 'rentals:saved_edit' saved.pk %}" class="btn btn-primary">Edit</a>
+            <a href="{% url 'rentals:saved_delete' saved.pk %}" class="btn btn-outline-danger">Delete</a>
+          </div>
+        {% endif %}
       </div>
       <div class="card-footer bg-transparent small text-body-secondary" data-testid="fetched-at">
         Movie information last updated from TMDB on {{ movie.fetched_at|date:"M j, Y" }}.

@@ -8,7 +8,8 @@ from django.utils.html import format_html
 from django.views.decorators.http import require_POST
 
 from . import services, tmdb
-from .models import SavedMovie
+from .forms import SavedMovieForm
+from .models import DEFAULT_RENTAL_DAYS, SavedMovie
 
 POSTER_BASE_URL = "https://image.tmdb.org/t/p/w342"
 # TMDB serves at most 500 pages of search results.
@@ -144,4 +145,77 @@ def saved_detail(request, pk):
         "movie", "owner"
     )
     saved = get_object_or_404(queryset, pk=pk)
-    return render(request, "rentals/saved_detail.html", {"saved": saved})
+    return render(
+        request,
+        "rentals/saved_detail.html",
+        {"saved": saved, "can_edit": saved.can_edit(request.user)},
+    )
+
+
+def _get_editable(request, pk):
+    """The entry if ``request.user`` may edit it (owner or staff), else 404.
+
+    A 404 rather than a 403 avoids revealing Private entries to other users.
+    """
+    queryset = SavedMovie.objects.editable_by(request.user).select_related(
+        "movie", "owner"
+    )
+    return get_object_or_404(queryset, pk=pk)
+
+
+@login_required
+def saved_edit(request, pk):
+    saved = _get_editable(request, pk)
+    form = SavedMovieForm(request.POST or None, instance=saved)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(
+            request,
+            format_html(
+                "Saved your changes to <strong>{}</strong>.", saved.movie.title
+            ),
+        )
+        return redirect(saved)
+    return render(request, "rentals/saved_edit.html", {"saved": saved, "form": form})
+
+
+@login_required
+def saved_delete(request, pk):
+    saved = _get_editable(request, pk)
+    if request.method == "POST":
+        title = saved.movie.title
+        saved.delete()
+        messages.success(
+            request,
+            format_html("Removed <strong>{}</strong> from the library.", title),
+        )
+        return redirect("rentals:library")
+    return render(request, "rentals/saved_delete.html", {"saved": saved})
+
+
+def _quick_status_change(request, pk, status, verb):
+    saved = _get_editable(request, pk)
+    saved.change_status(status, DEFAULT_RENTAL_DAYS)
+    saved.save()
+    messages.success(
+        request, format_html("{} <strong>{}</strong>.", verb, saved.movie.title)
+    )
+    return redirect("rentals:library")
+
+
+@login_required
+@require_POST
+def saved_rent(request, pk):
+    """One-click Rent (2 days) from a library card."""
+    return _quick_status_change(
+        request, pk, SavedMovie.Status.RENTED, f"Rented for {DEFAULT_RENTAL_DAYS} days:"
+    )
+
+
+@login_required
+@require_POST
+def saved_watched(request, pk):
+    """One-click Mark watched from a library card."""
+    return _quick_status_change(
+        request, pk, SavedMovie.Status.WATCHED, "Marked as watched:"
+    )

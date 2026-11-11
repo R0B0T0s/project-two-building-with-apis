@@ -13,12 +13,27 @@
         <a href="{{ saved.get_absolute_url }}" class="link-body-emphasis text-decoration-none stretched-link">{{ saved.movie.title }}</a>
       </h2>
       <p class="small text-body-secondary mb-2">{{ saved.movie.release_year|default:"Year unknown" }}</p>
-      <span class="badge {% if saved.status == 'rented' %}text-bg-primary{% elif saved.status == 'watched' %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ saved.get_status_display }}</span>
+      {% include "rentals/includes/rental_badges.html" %}
       {% if saved.stars %}
         <div class="text-warning mt-2" aria-label="Rated {{ saved.rating }} out of 5">{{ saved.stars }}</div>
       {% else %}
         <div class="small text-body-secondary mt-2">Not rated</div>
       {% endif %}
+    </div>
+    {# position-relative + z-2 keeps these above the title's stretched link. #}
+    <div class="card-footer bg-transparent d-flex flex-wrap gap-2 position-relative z-2" data-testid="card-actions">
+      {% if saved.status == 'rented' %}
+        <form method="post" action="{% url 'rentals:saved_watched' saved.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-success">Mark watched</button>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'rentals:saved_rent' saved.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-primary">Rent (2 days)</button>
+        </form>
+      {% endif %}
+      <a href="{% url 'rentals:saved_edit' saved.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
     </div>
   </div>
 </div>
