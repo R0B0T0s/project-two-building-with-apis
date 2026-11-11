@@ -28,6 +28,24 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Implemented Phase 4: one-click save, models, "In your library ✓" and Django admin
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement phase 4`
+2. I approve *(TDD behaviors: save flow reuses a fresh Movie or fetches a stale/missing one; TMDB failure during save creates nothing and shows an error; saved results show "In your library ✓"; plus a stub `/saved/<id>/` page as the link target)*
+3. I approve *(cycle 1 RED: missing movie fetched and stored with genres, 150-day-old reused without TMDB, 200-day-old re-fetched)*
+4. Move on
+5. I approve *(cycle 2 RED: TMDB failure on POST to Save → back to `/find/?q=alien&page=2`, no Movie/SavedMovie, red "wasn't saved" alert, no technical detail)*
+6. GO to cycle 3
+7. I approve *(cycle 3 RED: my saved Alien shows "In your library ✓" once with a link and no Save form; another user's saved Aliens still shows Save)*
+8. Yes, continue
+9. Manual verification has passed
+
+### Summary
+- **Outcome:** Added the `Genre`, `Movie` and `SavedMovie` models (unique owner+movie, a database check for rating 1–5) and migration `0001_initial`. `rentals/services.py` holds the shared save flow. It reuses a Movie fetched under 182 days ago and otherwise fetches TMDB details and stores them with `store_movie_details` (public, for the Phase 12 refresh command). A duplicate raises `AlreadySaved` before any TMDB call, and TMDB is always called before any write, so a failure saves nothing. Find-page cards got a Save button (posts `tmdb_id`, `q`, `page`) that returns to the same results with a success message and an "Edit details" link. Saved results show "In your library ✓" from one owner-scoped query. A stub `/saved/<id>/` page (owner and staff only, others get 404) is the link target until Phase 5. All three models are registered in the admin, and `rentals/permissions.py` has the `is_staff_user` helper. Three TDD cycles, each approved at RED, plus regular tests for defaults, duplicates, the unique and rating constraints, missing dates, the login and POST requirements, a bad `tmdb_id`, the stub page's access, the staff helper and the admin (including marking a user staff). 50 tests pass. Ruff lint and format and `makemigrations --check` are clean.
+- **Deviations:** None from the recommendations. The stub detail page was proposed and approved together with the TDD behaviors. Choices made without an explicit question: a duplicate save shows a blue info message with an "Edit details" link rather than an error. The save-failure wording is "Couldn't reach TMDB, so the movie wasn't saved. Try again in a minute." or "Movie search is temporarily unavailable, so the movie wasn't saved." An unreadable `tmdb_id` shows a generic error. The find view's page-URL helper was merged with the save view's.
+- **Sideways:** Cycle 1's first run errored on `NotImplementedError` instead of failing an assertion, so minimal scaffolding was added. Its later subtests then errored on a variable from the first subtest and were repaired to look the movie up by `tmdb_id` (a mechanical repair). Cycle 2's test was mechanically repaired twice. It now also patches `search_movies`, so following the redirect never calls the real TMDB, and it compares against the HTML-escaped "wasn&#x27;t saved". An `Edit` on `views.py` matched twice and a bash heredoc broke on quoting, and both were redone with other tools. The first commit attempt failed because PowerShell split the message at its inner quotes, and nothing was committed until it was retried from a message file. No superuser existed, so manual verification started with `createsuperuser`.
+
 ## 2026-11-10 — Implemented Phase 3: TMDB service module and the find (search) page
 
 ### Prompts

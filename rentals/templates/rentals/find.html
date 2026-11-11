@@ -32,6 +32,19 @@
             <p class="small text-body-secondary mb-2">{{ movie.year|default:"Year unknown" }}</p>
             <p class="card-text small">{{ movie.overview|default:"No overview available."|truncatechars:160 }}</p>
           </div>
+          <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+            {% if movie.saved_url %}
+              <a href="{{ movie.saved_url }}" class="btn btn-sm btn-outline-success w-100" data-testid="in-library">In your library ✓</a>
+            {% else %}
+              <form method="post" action="{% url 'rentals:save' %}" class="m-0" data-testid="save-form">
+                {% csrf_token %}
+                <input type="hidden" name="tmdb_id" value="{{ movie.tmdb_id }}">
+                <input type="hidden" name="q" value="{{ query }}">
+                <input type="hidden" name="page" value="{{ page }}">
+                <button type="submit" class="btn btn-sm btn-primary w-100">Save to library</button>
+              </form>
+            {% endif %}
+          </div>
         </div>
       </div>
     {% endfor %}

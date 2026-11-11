@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}{{ saved.movie.title }} – Movie Rental{% endblock %}
+
+{% block content %}
+{# Minimal stub: the full detail page arrives in Phase 5, editing in Phase 6. #}
+<div class="card shadow-sm" style="max-width: 40rem;">
+  <div class="card-body">
+    <h1 class="h4 card-title">{{ saved.movie.title }}{% if saved.movie.release_year %} <span class="text-body-secondary">({{ saved.movie.release_year }})</span>{% endif %}</h1>
+    <p class="mb-1"><span class="badge text-bg-secondary">{{ saved.get_status_display }}</span>
+      <span class="badge text-bg-light border">{{ saved.get_visibility_display }}</span></p>
+    <p class="small text-body-secondary mb-0">The full detail and edit pages are coming soon.</p>
+  </div>
+</div>
+{% endblock %}

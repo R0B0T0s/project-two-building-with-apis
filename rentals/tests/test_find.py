@@ -3,8 +3,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from rentals import tmdb
+from rentals.models import Movie, SavedMovie
 
 User = get_user_model()
 
@@ -152,3 +154,36 @@ class FindPageTests(TestCase):
         self.assertContains(response, "No poster")
         self.assertContains(response, "Year unknown")
         self.assertNotContains(response, "image.tmdb.org/t/p/w342None")
+
+
+class FindPageLibraryStatusTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("moviefan", password="x")
+        self.client.force_login(self.user)
+
+    @patch("rentals.tmdb.search_movies")
+    def test_saved_movie_shows_in_your_library_instead_of_save_button(
+        self, search_movies
+    ):
+        alien = Movie.objects.create(
+            tmdb_id=ALIEN["id"], title="Alien", fetched_at=timezone.now()
+        )
+        saved = SavedMovie.objects.create(owner=self.user, movie=alien)
+        # Someone else saving Aliens must not mark it as in *my* library.
+        aliens = Movie.objects.create(
+            tmdb_id=ALIENS["id"], title="Aliens", fetched_at=timezone.now()
+        )
+        other = User.objects.create_user("friend", password="x")
+        SavedMovie.objects.create(owner=other, movie=aliens)
+        search_movies.return_value = {
+            "results": [ALIEN, ALIENS],
+            "page": 1,
+            "total_pages": 1,
+        }
+
+        response = self.client.get(reverse("rentals:find"), {"q": "alien"})
+
+        self.assertContains(response, "In your library ✓", count=1)
+        self.assertContains(response, f'href="{saved.get_absolute_url()}"')
+        self.assertNotContains(response, f'name="tmdb_id" value="{ALIEN["id"]}"')
+        self.assertContains(response, f'name="tmdb_id" value="{ALIENS["id"]}"')
