@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}{% if query %}“{{ query }}” – {% endif %}Find movies – Movie Rental{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-3">
+  {% if query %}TMDB results for “{{ query }}”{% else %}Find movies on TMDB{% endif %}
+</h1>
+
+{% if tmdb_failed %}
+  <div class="alert alert-warning" role="alert" data-testid="tmdb-error">
+    {% if tmdb_unreachable %}
+      Couldn't reach TMDB right now. Your saved movies still work. Try again in a minute.
+    {% else %}
+      Movie search is temporarily unavailable.
+    {% endif %}
+  </div>
+{% elif not query %}
+  <p class="text-body-secondary">Type a movie title in the search box at the top of the page.</p>
+{% elif movies %}
+  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+    {% for movie in movies %}
+      <div class="col">
+        <div class="card h-100 shadow-sm" data-testid="result-card">
+          {% if movie.poster_url %}
+            <img src="{{ movie.poster_url }}" class="card-img-top" alt="Poster for {{ movie.title }}" loading="lazy">
+          {% else %}
+            <div class="card-img-top bg-secondary-subtle d-flex align-items-center justify-content-center text-body-secondary" style="aspect-ratio: 2 / 3;">No poster</div>
+          {% endif %}
+          <div class="card-body">
+            <h2 class="h6 card-title mb-1">{{ movie.title }}</h2>
+            <p class="small text-body-secondary mb-2">{{ movie.year|default:"Year unknown" }}</p>
+            <p class="card-text small">{{ movie.overview|default:"No overview available."|truncatechars:160 }}</p>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if prev_url or next_url %}
+    <nav class="d-flex justify-content-between align-items-center mt-4" aria-label="TMDB result pages">
+      {% if prev_url %}
+        <a class="btn btn-outline-secondary" href="{{ prev_url }}">&larr; Prev</a>
+      {% else %}
+        <span class="btn btn-outline-secondary disabled" aria-disabled="true">&larr; Prev</span>
+      {% endif %}
+      <span class="small text-body-secondary">Page {{ page }} of {{ total_pages }}</span>
+      {% if next_url %}
+        <a class="btn btn-outline-secondary" href="{{ next_url }}">Next &rarr;</a>
+      {% else %}
+        <span class="btn btn-outline-secondary disabled" aria-disabled="true">Next &rarr;</span>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% else %}
+  <p class="text-body-secondary">No movies found for “{{ query }}”.</p>
+{% endif %}
+{% endblock %}

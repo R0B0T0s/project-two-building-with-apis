@@ -28,6 +28,24 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Implemented Phase 3: TMDB service module and the find (search) page
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 3`
+2. Go ahead *(TDD behaviors: every TMDB failure becomes `TMDBUnavailable` with an `unreachable` flag; find page shows poster cards with Prev/Next; find page shows the matching friendly message on failure)*
+3. Yes, approve the test *(cycle 1 RED: timeout/connection error → `unreachable=True`; 401/429/500/bad JSON → `unreachable=False`)*
+4. Yes, move on to cycle 2
+5. Yes, approve the test *(cycle 2 RED: `/find/?q=alien&page=2` shows title, year, overview, poster and Prev/Next links to pages 1 and 3)*
+6. Yes, move on to cycle 3
+7. Yes, approve the test *(cycle 3 RED: unreachable → "Couldn't reach TMDB…", other failures → generic message, no technical detail on the page)*
+8. Yes, go ahead *(finish the phase with ordinary tests, Ruff and the full suite)*
+9. Manual verification has passed, also that image.png is the TMDB logo.
+
+### Summary
+- **Outcome:** Added `rentals/tmdb.py`: one `_get()` helper sends the Read Access Token as a Bearer header with a 10s timeout and turns every failure into `TMDBUnavailable` (`unreachable=True` for timeouts and connection errors, `False` for non-OK statuses, other request errors and bad JSON), logging the technical cause to the `rentals.tmdb` logger. It exposes `search_movies(query, page)` (returns `results`, `page`, `total_pages`) and `get_movie_details(tmdb_id)` for Phase 4. Added the login-required `rentals:find` view at `/find/` with `rentals/templates/rentals/find.html`: a 2/3/4-column poster card grid (title, year, overview, `w342` poster or a "No poster" placeholder), Prev / "Page X of Y" / Next links (page clamped to 1–500), an empty-query hint, a zero-results message and a Bootstrap warning alert with the two PRD messages. The navbar search box now submits to the find page and keeps the query. Settings got a `LOGGING` config so TMDB failures print to the server console. The TMDB logo finally landed as `static/images/tmdb-logo.png`, and the About page and its test now point at it. New tests: `rentals/tests/test_tmdb.py` (6) and `rentals/tests/test_find.py` (9). All 33 tests, Ruff lint and format and `manage.py check` pass, and a live search against TMDB returned real results.
+- **Deviations:** None from the user. Choices made without an explicit question: the find page lives at `/find/`; the poster size is TMDB's `w342`; overviews are truncated to 160 characters; out-of-range or non-numeric page numbers fall back into 1–500; the logo was saved as a PNG instead of the SVG the Phase 1 template expected, so the template and test were updated.
+- **Sideways:** Cycle 1's first run errored because `responses.replace` needs an existing registration; it was switched to `responses.upsert` before approval. Cycle 3's crash was turned into an assertion failure with `raise_request_exception = False`, as in Phase 2, and an unneeded `html=False` argument was removed before approval. After GREEN, cycle 1's test printed its expected failure logs into the test output; `logging.disable` was added to that test class's `setUp` as a mechanical, non-asserting change.
+
 ## 2026-11-10 — Implemented Phase 2: Accounts (sign-up, login/logout, password change, My Account, navbar)
 
 ### Prompts

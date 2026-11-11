@@ -10,7 +10,7 @@ class AboutPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'alt="TMDB logo"')
-        self.assertContains(response, "images/tmdb-logo.svg")
+        self.assertContains(response, "images/tmdb-logo.png")
         self.assertContains(response, TMDB_NOTICE)
         self.assertContains(
             response,
