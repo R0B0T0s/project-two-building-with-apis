@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}My Library – Movie Rental{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">My Library</h1>
+  <span class="small text-body-secondary">{{ saved_movies|length }} saved movie{{ saved_movies|length|pluralize }}</span>
+</div>
+
+{% if saved_movies %}
+  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+    {% for saved in saved_movies %}
+      {% include "rentals/includes/saved_card.html" %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="text-center py-5" data-testid="library-empty">
+    <p class="text-body-secondary">You haven't saved any movies yet.</p>
+    <p class="small">Use the search box at the top of the page to find movies on TMDB.</p>
+  </div>
+{% endif %}
+{% endblock %}

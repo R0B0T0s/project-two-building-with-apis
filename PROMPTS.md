@@ -28,6 +28,24 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-10 — Implemented Phase 5: My Library grid, full detail page and `visible_to`
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 5`
+2. Go ahead *(TDD behaviors: `visible_to` on Private entries; My Library lists only the signed-in user's entries; detail page 404s for excluded viewers and shows every field without TMDB calls)*
+3. Go ahead *(cycle 1 RED: Private entry visible to owner, hidden from another user and a signed-out visitor)*
+4. Move on
+5. Go ahead *(cycle 2 RED: My Library shows exactly my 2 cards, not another user's Public entry)*
+6. Move on
+7. Go ahead *(cycle 3 RED: other user and signed-out visitor get 404 on a Private entry's detail page)*
+8. Go ahead *(finish the rest of the phase normally)*
+9. Manual verification has passed
+
+### Summary
+- **Outcome:** Added `SavedMovieQuerySet.visible_to(user)` with the full view rule (staff see all; signed-out see Public; signed-in see their own, Public, and Shared-with-them entries) and a `stars` property on `SavedMovie`. Added the login-required My Library page at `/library/` (owner-only, 2/3/4-column poster grid, newest first, empty-state hint) using a reusable `rentals/includes/saved_card.html` card for Phase 8. Replaced the Phase 4 stub detail page with the full record (poster, overview, genres, status, due date, rating, notes, owner, visibility, "last updated from TMDB on …"). It no longer requires login and 404s for anyone `visible_to` excludes. The navbar's My Library link and the home page now point to the library. Three TDD cycles, each approved at RED, plus regular tests for the library's login requirement, empty state and no-TMDB rendering. 57 tests pass. Ruff lint and format and `makemigrations --check` are clean.
+- **Deviations:** None. Every recommendation was accepted. `visible_to` was written with the full rule even though the cycle-1 test only covers the Private cases, and the Public, Shared and staff branches stay untested until Phase 7.
+- **Sideways:** Cycle 3 used two tests, not one. The every-field detail test passed as soon as the template was built, so it never had a real RED. This was disclosed at the RED step, and the test was kept as a normal test. Only the 404 test was the real test-first one, and it failed with `302 != 404` because of `@login_required`. Ruff then caught an unused `is_staff_user` import in `views.py`, which was removed. Every `uv run` warned about the unrelated active `django-test` virtualenv (harmless).
+
 ## 2026-11-10 — Implemented Phase 4: one-click save, models, "In your library ✓" and Django admin
 
 ### Prompts

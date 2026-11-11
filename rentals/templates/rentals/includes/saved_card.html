@@ -1,0 +1,24 @@
+{# One poster card for a SavedMovie. Expects `saved` in the context. #}
+<div class="col">
+  <div class="card h-100 shadow-sm" data-testid="saved-card">
+    <a href="{{ saved.get_absolute_url }}" class="text-decoration-none">
+      {% if saved.movie.poster_url %}
+        <img src="{{ saved.movie.poster_url }}" class="card-img-top" alt="Poster for {{ saved.movie.title }}" loading="lazy">
+      {% else %}
+        <div class="card-img-top bg-secondary-subtle d-flex align-items-center justify-content-center text-body-secondary" style="aspect-ratio: 2 / 3;">No poster</div>
+      {% endif %}
+    </a>
+    <div class="card-body">
+      <h2 class="h6 card-title mb-1">
+        <a href="{{ saved.get_absolute_url }}" class="link-body-emphasis text-decoration-none stretched-link">{{ saved.movie.title }}</a>
+      </h2>
+      <p class="small text-body-secondary mb-2">{{ saved.movie.release_year|default:"Year unknown" }}</p>
+      <span class="badge {% if saved.status == 'rented' %}text-bg-primary{% elif saved.status == 'watched' %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ saved.get_status_display }}</span>
+      {% if saved.stars %}
+        <div class="text-warning mt-2" aria-label="Rated {{ saved.rating }} out of 5">{{ saved.stars }}</div>
+      {% else %}
+        <div class="small text-body-secondary mt-2">Not rated</div>
+      {% endif %}
+    </div>
+  </div>
+</div>

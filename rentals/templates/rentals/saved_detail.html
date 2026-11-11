@@ -3,13 +3,55 @@
 {% block title %}{{ saved.movie.title }} – Movie Rental{% endblock %}
 
 {% block content %}
-{# Minimal stub: the full detail page arrives in Phase 5, editing in Phase 6. #}
-<div class="card shadow-sm" style="max-width: 40rem;">
-  <div class="card-body">
-    <h1 class="h4 card-title">{{ saved.movie.title }}{% if saved.movie.release_year %} <span class="text-body-secondary">({{ saved.movie.release_year }})</span>{% endif %}</h1>
-    <p class="mb-1"><span class="badge text-bg-secondary">{{ saved.get_status_display }}</span>
-      <span class="badge text-bg-light border">{{ saved.get_visibility_display }}</span></p>
-    <p class="small text-body-secondary mb-0">The full detail and edit pages are coming soon.</p>
+{% with movie=saved.movie %}
+<div class="card shadow-sm">
+  <div class="row g-0">
+    <div class="col-md-4 col-lg-3">
+      {% if movie.poster_url %}
+        <img src="{{ movie.poster_url }}" class="img-fluid rounded-start w-100" alt="Poster for {{ movie.title }}">
+      {% else %}
+        <div class="bg-secondary-subtle d-flex align-items-center justify-content-center text-body-secondary rounded-start" style="aspect-ratio: 2 / 3;">No poster</div>
+      {% endif %}
+    </div>
+    <div class="col-md-8 col-lg-9">
+      <div class="card-body">
+        <h1 class="h3 card-title mb-1">{{ movie.title }}{% if movie.release_year %} <span class="text-body-secondary fw-normal">({{ movie.release_year }})</span>{% endif %}</h1>
+        <p class="mb-3" data-testid="genres">
+          {% for genre in movie.genres.all %}
+            <span class="badge rounded-pill text-bg-light border">{{ genre.name }}</span>
+          {% empty %}
+            <span class="small text-body-secondary">No genres listed</span>
+          {% endfor %}
+        </p>
+        <p class="card-text">{{ movie.overview|default:"No overview available." }}</p>
+
+        <dl class="row mb-0">
+          <dt class="col-sm-4 col-lg-3">Status</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="status">
+            <span class="badge {% if saved.status == 'rented' %}text-bg-primary{% elif saved.status == 'watched' %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ saved.get_status_display }}</span>
+          </dd>
+
+          <dt class="col-sm-4 col-lg-3">Due date</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="due-date">{% if saved.due_at %}{{ saved.due_at|date:"M j, Y" }}{% else %}<span class="text-body-secondary">Not rented</span>{% endif %}</dd>
+
+          <dt class="col-sm-4 col-lg-3">Your rating</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="rating">{% if saved.stars %}<span class="text-warning" aria-label="Rated {{ saved.rating }} out of 5">{{ saved.stars }}</span>{% else %}<span class="text-body-secondary">Not rated</span>{% endif %}</dd>
+
+          <dt class="col-sm-4 col-lg-3">Notes</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="notes">{% if saved.notes %}{{ saved.notes|linebreaksbr }}{% else %}<span class="text-body-secondary">No notes</span>{% endif %}</dd>
+
+          <dt class="col-sm-4 col-lg-3">Owner</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="owner">{{ saved.owner.username }}</dd>
+
+          <dt class="col-sm-4 col-lg-3">Visibility</dt>
+          <dd class="col-sm-8 col-lg-9" data-testid="visibility">{{ saved.get_visibility_display }}</dd>
+        </dl>
+      </div>
+      <div class="card-footer bg-transparent small text-body-secondary" data-testid="fetched-at">
+        Movie information last updated from TMDB on {{ movie.fetched_at|date:"M j, Y" }}.
+      </div>
+    </div>
   </div>
 </div>
+{% endwith %}
 {% endblock %}

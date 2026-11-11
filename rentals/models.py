@@ -3,6 +3,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 
+from .permissions import is_staff_user
+
 
 class Genre(models.Model):
     """A TMDB genre. ``tmdb_id`` is TMDB's own genre ID."""
@@ -43,6 +45,28 @@ class Movie(models.Model):
         return f"https://image.tmdb.org/t/p/w342{self.poster_path}"
 
 
+class SavedMovieQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """Entries ``user`` may view: the single view rule used everywhere.
+
+        The owner and staff see everything; anyone sees Public entries; a
+        Shared entry is also visible to the users listed in ``shared_with``.
+        Signed-out viewers see Public entries only.
+        """
+        if is_staff_user(user):
+            return self.all()
+        public = models.Q(visibility=SavedMovie.Visibility.PUBLIC)
+        if not user or not user.is_authenticated:
+            return self.filter(public)
+        shared_with_user = models.Q(
+            visibility=SavedMovie.Visibility.SHARED,
+            pk__in=SavedMovie.shared_with.through.objects.filter(user=user).values(
+                "savedmovie"
+            ),
+        )
+        return self.filter(models.Q(owner=user) | public | shared_with_user)
+
+
 class SavedMovie(models.Model):
     """A movie in one user's library."""
 
@@ -81,6 +105,8 @@ class SavedMovie(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = SavedMovieQuerySet.as_manager()
+
     class Meta:
         ordering = ["-created_at", "-id"]
         constraints = [
@@ -99,3 +125,10 @@ class SavedMovie(models.Model):
 
     def get_absolute_url(self):
         return reverse("rentals:saved_detail", args=[self.pk])
+
+    @property
+    def stars(self):
+        """The rating as five stars, e.g. ``★★★☆☆``; empty when unrated."""
+        if not self.rating:
+            return ""
+        return "★" * self.rating + "☆" * (5 - self.rating)

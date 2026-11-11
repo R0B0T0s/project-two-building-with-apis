@@ -9,7 +9,6 @@ from django.views.decorators.http import require_POST
 
 from . import services, tmdb
 from .models import SavedMovie
-from .permissions import is_staff_user
 
 POSTER_BASE_URL = "https://image.tmdb.org/t/p/w342"
 # TMDB serves at most 500 pages of search results.
@@ -129,10 +128,20 @@ def save(request):
 
 
 @login_required
+def library(request):
+    """My Library: the signed-in user's saved movies, from local data only."""
+    saved_movies = SavedMovie.objects.filter(owner=request.user).select_related("movie")
+    return render(request, "rentals/library.html", {"saved_movies": saved_movies})
+
+
 def saved_detail(request, pk):
-    """Stub detail page; Phase 5 replaces it with the full record."""
-    queryset = SavedMovie.objects.select_related("movie", "owner")
-    if not is_staff_user(request.user):
-        queryset = queryset.filter(owner=request.user)
+    """Full record for one saved movie, from local data only.
+
+    Anyone ``visible_to`` excludes (including signed-out visitors on a
+    non-Public entry) gets a 404, so the entry's existence isn't revealed.
+    """
+    queryset = SavedMovie.objects.visible_to(request.user).select_related(
+        "movie", "owner"
+    )
     saved = get_object_or_404(queryset, pk=pk)
     return render(request, "rentals/saved_detail.html", {"saved": saved})

@@ -4,6 +4,9 @@
 <div class="text-center py-5">
   <h1 class="h3">Welcome to Movie Rental</h1>
   <p class="text-body-secondary">Find movies on TMDB, save them to your library and track your rentals.</p>
-  <p class="small text-body-secondary">My Library, Community and search are coming soon.</p>
+  <p>
+    <a class="btn btn-primary" href="{% url 'rentals:library' %}">Go to My Library</a>
+  </p>
+  <p class="small text-body-secondary">The Community page is coming soon.</p>
 </div>
 {% endblock %}
