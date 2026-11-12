@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from . import services, tmdb
@@ -128,11 +129,36 @@ def save(request):
     return redirect(back)
 
 
+def _saved_list(request, queryset, *, community):
+    """The one list view behind My Library and Community.
+
+    The two pages differ only in their starting ``queryset`` (and whether
+    cards show the owner). Everything renders from local data only.
+    """
+    saved_movies = list(queryset.select_related("movie", "owner"))
+    for saved in saved_movies:
+        saved.viewer_can_edit = saved.can_edit(request.user)
+    return render(
+        request,
+        "rentals/saved_list.html",
+        {"saved_movies": saved_movies, "community": community},
+    )
+
+
 @login_required
 def library(request):
-    """My Library: the signed-in user's saved movies, from local data only."""
-    saved_movies = SavedMovie.objects.filter(owner=request.user).select_related("movie")
-    return render(request, "rentals/library.html", {"saved_movies": saved_movies})
+    """My Library: the signed-in user's own saved movies."""
+    return _saved_list(
+        request, SavedMovie.objects.filter(owner=request.user), community=False
+    )
+
+
+def community(request):
+    """Community: other users' entries the viewer may see (open to everyone)."""
+    queryset = SavedMovie.objects.visible_to(request.user)
+    if request.user.is_authenticated:
+        queryset = queryset.exclude(owner=request.user)
+    return _saved_list(request, queryset, community=True)
 
 
 def saved_detail(request, pk):
@@ -200,13 +226,21 @@ def _quick_status_change(request, pk, status, verb):
     messages.success(
         request, format_html("{} <strong>{}</strong>.", verb, saved.movie.title)
     )
+    # Back to the list the card was on (My Library or Community), if safe.
+    next_url = request.POST.get("next", "")
+    if url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
     return redirect("rentals:library")
 
 
 @login_required
 @require_POST
 def saved_rent(request, pk):
-    """One-click Rent (2 days) from a library card."""
+    """One-click Rent (2 days) from a library or Community card."""
     return _quick_status_change(
         request, pk, SavedMovie.Status.RENTED, f"Rented for {DEFAULT_RENTAL_DAYS} days:"
     )
@@ -215,7 +249,7 @@ def saved_rent(request, pk):
 @login_required
 @require_POST
 def saved_watched(request, pk):
-    """One-click Mark watched from a library card."""
+    """One-click Mark watched from a library or Community card."""
     return _quick_status_change(
         request, pk, SavedMovie.Status.WATCHED, "Marked as watched:"
     )

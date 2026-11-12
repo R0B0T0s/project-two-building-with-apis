@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{% if community %}Community{% else %}My Library{% endif %} – Movie Rental{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">{% if community %}Community{% else %}My Library{% endif %}</h1>
+  <span class="small text-body-secondary">{{ saved_movies|length }} {% if community %}movie{{ saved_movies|length|pluralize }}{% else %}saved movie{{ saved_movies|length|pluralize }}{% endif %}</span>
+</div>
+
+{% if community %}
+  <p class="small text-body-secondary">
+    {% if user.is_authenticated %}
+      Movies other people have made Public or shared with you.
+    {% else %}
+      Public movies and reviews from Movie Rental users. <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Log in</a> to see movies shared with you.
+    {% endif %}
+  </p>
+{% endif %}
+
+{% if saved_movies %}
+  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+    {% for saved in saved_movies %}
+      {% include "rentals/includes/saved_card.html" with show_owner=community %}
+    {% endfor %}
+  </div>
+{% elif community %}
+  <div class="text-center py-5" data-testid="community-empty">
+    <p class="text-body-secondary">Nobody has shared any movies with you yet.</p>
+  </div>
+{% else %}
+  <div class="text-center py-5" data-testid="library-empty">
+    <p class="text-body-secondary">You haven't saved any movies yet.</p>
+    <p class="small">Use the search box at the top of the page to find movies on TMDB.</p>
+  </div>
+{% endif %}
+{% endblock %}

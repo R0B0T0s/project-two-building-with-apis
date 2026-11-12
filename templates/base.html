@@ -15,10 +15,9 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="main-nav">
-        {# Community is a placeholder until Phase 8. #}
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == 'library' %} active{% endif %}" href="{% url 'rentals:library' %}">My Library</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">Community</a></li>
+          <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == 'community' %} active{% endif %}" href="{% url 'rentals:community' %}">Community</a></li>
         </ul>
         <form class="d-flex me-md-3 my-2 my-md-0" role="search" action="{% url 'rentals:find' %}" method="get">
           <input class="form-control form-control-sm me-2" type="search" name="q"

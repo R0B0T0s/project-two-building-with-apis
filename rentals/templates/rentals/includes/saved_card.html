@@ -1,4 +1,4 @@
-{# One poster card for a SavedMovie. Expects `saved` in the context. #}
+{# One poster card for a SavedMovie. Expects `saved` (with `viewer_can_edit` set by the list view); optional `show_owner`. #}
 <div class="col">
   <div class="card h-100 shadow-sm" data-testid="saved-card">
     <a href="{{ saved.get_absolute_url }}" class="text-decoration-none">
@@ -16,6 +16,9 @@
         <span>{{ saved.movie.release_year|default:"Year unknown" }}</span>
         {% include "rentals/includes/visibility_icon.html" %}
       </p>
+      {% if show_owner %}
+        <p class="small mb-2 text-truncate" data-testid="card-owner">by @{{ saved.owner.username }}</p>
+      {% endif %}
       {% include "rentals/includes/rental_badges.html" %}
       {% if saved.stars %}
         <div class="text-warning mt-2" aria-label="Rated {{ saved.rating }} out of 5">{{ saved.stars }}</div>
@@ -24,19 +27,23 @@
       {% endif %}
     </div>
     {# position-relative + z-2 keeps these above the title's stretched link. #}
+    {% if saved.viewer_can_edit %}
     <div class="card-footer bg-transparent d-flex flex-wrap gap-2 position-relative z-2" data-testid="card-actions">
       {% if saved.status == 'rented' %}
         <form method="post" action="{% url 'rentals:saved_watched' saved.pk %}">
           {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <button type="submit" class="btn btn-sm btn-success">Mark watched</button>
         </form>
       {% else %}
         <form method="post" action="{% url 'rentals:saved_rent' saved.pk %}">
           {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <button type="submit" class="btn btn-sm btn-primary">Rent (2 days)</button>
         </form>
       {% endif %}
       <a href="{% url 'rentals:saved_edit' saved.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
     </div>
+    {% endif %}
   </div>
 </div>

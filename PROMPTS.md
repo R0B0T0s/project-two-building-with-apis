@@ -28,6 +28,23 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Implemented Phase 8: Community page (shared list view, owner on cards, edit-only actions)
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement phase 8`
+2. I approve *(TDD behaviors: a signed-in user sees others' Public and shared-with-them entries only; signed-out visitors see Public only; cards show the owner and actions only where the viewer can edit)*
+3. I approve *(cycle 1 RED: Community, still starting from an empty placeholder queryset, listed nothing)*
+4. Yes, go on to cycle 2 *(the signed-out test passed on its first run; no RED)*
+5. Yes, go on to cycle 3 *(cycle 3 RED: no `card-owner` line on any card)*
+6. I approve
+7. Yes, go ahead with those *(normal implementation: navbar link, return to Community after a quick action, Ruff)*
+8. Manual verification passed
+
+### Summary
+- **Outcome:** My Library and Community are now served by one `_saved_list` view and a shared `saved_list.html` template (renamed from `library.html`). Community starts from `visible_to(user)` minus the viewer's own entries and doesn't require login, so signed-out visitors see Public entries only. Community cards show "by @username". Rent, Mark watched and Edit render only when `can_edit` is true for the viewer, so regular users and signed-out visitors get read-only cards and staff get the actions. One-click actions now send a `next` value checked with `url_has_allowed_host_and_scheme`, so staff return to Community, and an unsafe `next` falls back to My Library. The navbar Community link works and highlights when active, and the home page's "coming soon" note became a "Browse Community" button. `rentals/tests/test_community.py` adds 6 tests. 87 tests pass, Ruff and the migration check are clean, and the user passed manual verification in the browser.
+- **Deviations:** None. All recommendations were accepted as proposed. The `next` redirect wasn't in the plan; it was proposed as follow-up work and approved.
+- **Sideways:** Cycle 2's test passed on its first run, because cycle 1's code (no `@login_required`, plus `visible_to` for anonymous users) already covered it. This was reported rather than hidden. The test was then shown to catch a mistake by briefly adding `@login_required` to the view (it failed with 302 != 200) and removing it again. Cycle 1's RED came from a deliberate empty placeholder queryset. By the plan's wording, staff see other users' Private entries on Community too, and this was noted at cycle 1.
+
 ## 2026-11-12 — Implemented Phase 7: privacy and sharing (visibility, shared-with usernames, permission matrix)
 
 ### Prompts
