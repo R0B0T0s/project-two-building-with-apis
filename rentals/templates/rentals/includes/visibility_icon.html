@@ -1,0 +1,2 @@
+{# Visibility icon with an accessible label. Expects `saved`; optional `with_label`. #}
+<span data-testid="visibility-icon" data-visibility="{{ saved.visibility }}" title="{{ saved.get_visibility_display }}"{% if not with_label %} aria-label="{{ saved.get_visibility_display }}"{% endif %}>{% if saved.visibility == 'public' %}🌐{% elif saved.visibility == 'shared' %}👥{% else %}🔒{% endif %}{% if with_label %} {{ saved.get_visibility_display }}{% endif %}</span>

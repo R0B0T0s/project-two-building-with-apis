@@ -48,7 +48,16 @@
           <dd class="col-sm-8 col-lg-9" data-testid="owner">{{ saved.owner.username }}</dd>
 
           <dt class="col-sm-4 col-lg-3">Visibility</dt>
-          <dd class="col-sm-8 col-lg-9" data-testid="visibility">{{ saved.get_visibility_display }}</dd>
+          <dd class="col-sm-8 col-lg-9" data-testid="visibility">
+            {% include "rentals/includes/visibility_icon.html" with with_label=True %}
+            {% if saved.visibility == 'public' %}<span class="small text-body-secondary">– anyone can see this entry and its notes</span>
+            {% elif saved.visibility == 'private' %}<span class="small text-body-secondary">– only the owner (and staff, for support)</span>{% endif %}
+            {% if saved.visibility == 'shared' and can_edit %}
+              <div class="small mt-1" data-testid="shared-with">Shared with:
+                {% for user in saved.shared_with.all %}<span class="badge rounded-pill text-bg-light border">{{ user.username }}</span>{% empty %}<span class="text-body-secondary">nobody yet</span>{% endfor %}
+              </div>
+            {% endif %}
+          </dd>
         </dl>
 
         {% if can_edit %}

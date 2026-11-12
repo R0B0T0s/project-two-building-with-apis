@@ -56,6 +56,35 @@
             <div class="form-text small">{{ form.notes.help_text }}</div>
           </div>
 
+          <fieldset class="mb-3">
+            <legend class="form-label fs-6 mb-2">{{ form.visibility.label }}</legend>
+            {% for value, label in form.visibility.field.choices %}
+              <div class="form-check">
+                <input class="form-check-input{% if form.visibility.errors %} is-invalid{% endif %}" type="radio" name="{{ form.visibility.html_name }}" id="visibility-{{ value }}" value="{{ value }}"{% if form.visibility.value == value %} checked{% endif %}>
+                <label class="form-check-label" for="visibility-{{ value }}">
+                  {% if value == 'private' %}<span aria-hidden="true">🔒</span> <strong>Private</strong> <span class="text-body-secondary small">– only you (the default)</span>
+                  {% elif value == 'public' %}<span aria-hidden="true">🌐</span> <strong>Public</strong> <span class="text-body-secondary small">– anyone, including visitors who aren't signed in</span>
+                  {% else %}<span aria-hidden="true">👥</span> <strong>Shared</strong> <span class="text-body-secondary small">– only the usernames listed below</span>{% endif %}
+                </label>
+              </div>
+            {% endfor %}
+            {% for error in form.visibility.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </fieldset>
+
+          <div class="mb-3">
+            <label for="{{ form.shared_usernames.id_for_label }}" class="form-label">{{ form.shared_usernames.label }}</label>
+            <input type="text" name="{{ form.shared_usernames.html_name }}" id="{{ form.shared_usernames.id_for_label }}" class="form-control{% if form.shared_usernames.errors %} is-invalid{% endif %}" value="{{ form.shared_usernames.value|default_if_none:'' }}" placeholder="e.g. alice, bob" autocomplete="off">
+            {% for error in form.shared_usernames.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+            <div class="form-text small">{{ form.shared_usernames.help_text }}</div>
+          </div>
+
+          <div class="alert alert-secondary small" role="note" data-testid="privacy-note">
+            Every movie you save starts out <strong>Private</strong>. Whatever you choose,
+            our employees and admins can still see all entries, including Private ones
+            and their notes, so they can help with support.
+            <a href="{% url 'rentals:about' %}" class="alert-link">More on the About page</a>.
+          </div>
+
           <button type="submit" class="btn btn-primary">Save changes</button>
           <a href="{{ saved.get_absolute_url }}" class="btn btn-outline-secondary ms-2">Cancel</a>
         </form>

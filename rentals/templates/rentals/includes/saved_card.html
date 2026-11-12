@@ -12,7 +12,10 @@
       <h2 class="h6 card-title mb-1">
         <a href="{{ saved.get_absolute_url }}" class="link-body-emphasis text-decoration-none stretched-link">{{ saved.movie.title }}</a>
       </h2>
-      <p class="small text-body-secondary mb-2">{{ saved.movie.release_year|default:"Year unknown" }}</p>
+      <p class="small text-body-secondary mb-2 d-flex justify-content-between">
+        <span>{{ saved.movie.release_year|default:"Year unknown" }}</span>
+        {% include "rentals/includes/visibility_icon.html" %}
+      </p>
       {% include "rentals/includes/rental_badges.html" %}
       {% if saved.stars %}
         <div class="text-warning mt-2" aria-label="Rated {{ saved.rating }} out of 5">{{ saved.stars }}</div>

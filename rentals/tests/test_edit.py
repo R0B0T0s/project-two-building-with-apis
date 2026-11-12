@@ -11,7 +11,13 @@ User = get_user_model()
 
 
 def edit_data(**overrides):
-    data = {"status": "want", "rental_days": "2", "rating": "", "notes": ""}
+    data = {
+        "status": "want",
+        "rental_days": "2",
+        "rating": "",
+        "notes": "",
+        "visibility": "private",
+    }
     data.update(overrides)
     return data
 

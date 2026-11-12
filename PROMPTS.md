@@ -28,6 +28,24 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Implemented Phase 7: privacy and sharing (visibility, shared-with usernames, permission matrix)
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 7`
+2. I approve *(TDD behaviors: sharing with usernames lets exactly those users view; an unknown username is a form error and nothing changes; Shared needs at least one username)*
+3. Go ahead *(cycle 1 RED: posting Shared with "alice, bob" left `shared_with` empty)*
+4. Move on
+5. Go ahead *(cycle 2 RED: "alice, nobody" was accepted and redirected instead of showing an error)*
+6. Move on
+7. Go ahead *(cycle 3 RED: Shared with " , " was accepted)*
+8. Move on *(normal implementation: visibility icons, detail-page share list, permission matrix and display tests)*
+9. Manual verification passed
+
+### Summary
+- **Outcome:** The edit form gained a visibility radio group (🔒 Private / 🌐 Public / 👥 Shared) and a comma-separated "Shared with" usernames field. Unknown usernames and Shared-with-nobody are rejected with field errors, and an invalid form changes nothing. The edit page now explains the Private default and staff access. Cards and the detail page show a visibility icon, and the detail page lists who an entry is shared with, but only to the owner and staff. `visible_to`, `editable_by` and `can_edit` from Phases 5–6 already covered the access rules, so no model or migration changes were needed. A new `rentals/tests/test_privacy.py` holds the three TDD tests and the full website matrix (owner, other user, shared-with user, employee, admin, signed-out × Private/Public/Shared × view/edit, plus delete). 81 tests pass, Ruff is clean, and the user passed manual verification in the browser.
+- **Deviations:** The third TDD behavior ("Shared needs at least one username") was the agent's own addition, not in the plan, and the user approved it. The permission matrix was written as normal tests rather than TDD, since the rules it checks already existed.
+- **Sideways:** Adding the required `visibility` field broke 14 Phase 6 tests whose `edit_data()` helper didn't send it. This was a mechanical repair: the helper now defaults to `"visibility": "private"`. The cycle 2 check `assertContains(response, "nobody")` is weak, because the redisplayed input also contains "nobody". The form-errors assertion is the real proof. Ruff reformatted two files after the tests were written.
+
 ## 2026-11-10 — Implemented Phase 6: edit, delete, rental rules, overdue and one-click card actions
 
 ### Prompts
