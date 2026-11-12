@@ -28,6 +28,23 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Implemented Phase 9: search, filter, sort and pagination (shared filter set, 12 per page)
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement phase 9`
+2. Go ahead *(TDD behaviors: rating sort puts unrated last in both directions with stable ties; Community search never matches other users' Private notes; "overdue only" keeps only rentals due before today)*
+3. Go ahead *(cycle 1 RED: the placeholder `sort` filter left the default newest-first order)*
+4. Go ahead *(cycle 2 RED: searching Community for "Secret" returned both Alien and Heat)*
+5. Continue
+6. Go ahead *(cycle 3 RED: "overdue only" returned all four entries)*
+7. move on *(normal implementation: remaining sorts, filter/sort/pagination/empty-state tests, Ruff)*
+8. Manual verification has passed.
+
+### Summary
+- **Outcome:** New `rentals/filters.py` holds one django-filter `SavedMovieFilter`, ready for the API to reuse. It has search (title or notes, any capitalisation), status, genre, minimum rating (excludes unrated), visibility, overdue only, and a `sort` filter with seven options taken from the prototype. Rating and release year put empty values last in both directions, title sort ignores capitalisation, and every sort ends with newest-saved-first as the tie-breaker. `CommunitySavedMovieFilter` drops visibility. The shared `_saved_list` view runs the filter over its starting queryset (still `visible_to` for Community, so search can't reach Private notes) and paginates 12 per page with `Paginator.get_page`, so bad pages show page 1 and pages past the end show the last page. `saved_list.html` gained a filter sidebar card, Prev/Next links that keep the filters, and a "No saved movies match these filters" state with a Clear filters link. The filter form has no page field, so applying filters resets to page 1. `rentals/tests/test_browse.py` adds 10 tests. 97 tests pass, Ruff and the migration check are clean, and the user passed manual verification.
+- **Deviations:** None from the user. The PRD lists four sorts; the prototype's seven (newest/oldest for date saved and year, highest/lowest for rating) were used, and title sort ignores capitalisation. Both were called out at manual verification.
+- **Sideways:** The first scaffold used `TypedChoiceFilter(empty_label=...)`, which crashed 15 existing tests; it was switched to a `ChoiceFilter`. Cycle 2's Private title "Ran" was renamed "Rashomon" before approval, because a three-letter string could match unrelated page text in `assertNotContains`. The search code adds no privacy check of its own; the privacy comes from narrowing the `visible_to` queryset, which was explained at GREEN. The user's "move on" after cycle 3's RED was taken as approval to continue, so GREEN was reported without a separate stop before the normal implementation.
+
 ## 2026-11-12 — Implemented Phase 8: Community page (shared list view, owner on cards, edit-only actions)
 
 ### Prompts

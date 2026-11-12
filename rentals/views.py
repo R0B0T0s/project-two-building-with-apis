@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -9,10 +10,13 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from . import services, tmdb
+from .filters import CommunitySavedMovieFilter, SavedMovieFilter
 from .forms import SavedMovieForm
 from .models import DEFAULT_RENTAL_DAYS, SavedMovie
 
 POSTER_BASE_URL = "https://image.tmdb.org/t/p/w342"
+# My Library and Community show 12 saved movies per page.
+PAGE_SIZE = 12
 # TMDB serves at most 500 pages of search results.
 MAX_TMDB_PAGE = 500
 
@@ -133,15 +137,36 @@ def _saved_list(request, queryset, *, community):
     """The one list view behind My Library and Community.
 
     The two pages differ only in their starting ``queryset`` (and whether
-    cards show the owner). Everything renders from local data only.
+    cards show the owner and offer the visibility filter). Search, filters,
+    sorting and pagination all run on local data, and only over the rows
+    in ``queryset``, which the caller has limited to what the viewer may see.
     """
-    saved_movies = list(queryset.select_related("movie", "owner"))
+    filter_class = CommunitySavedMovieFilter if community else SavedMovieFilter
+    filterset = filter_class(
+        request.GET, queryset=queryset.select_related("movie", "owner")
+    )
+    # get_page() turns a missing or bad page number into page 1 and one past
+    # the end into the last page. The filter form doesn't send `page`, so
+    # changing search, a filter or the sort always starts again at page 1.
+    page_obj = Paginator(filterset.qs, PAGE_SIZE).get_page(request.GET.get("page"))
+    saved_movies = list(page_obj.object_list)
     for saved in saved_movies:
         saved.viewer_can_edit = saved.can_edit(request.user)
+
+    params = request.GET.copy()
+    params.pop("page", None)
+    is_filtered = any(value and name != "sort" for name, value in params.items())
     return render(
         request,
         "rentals/saved_list.html",
-        {"saved_movies": saved_movies, "community": community},
+        {
+            "saved_movies": saved_movies,
+            "page_obj": page_obj,
+            "filter_form": filterset.form,
+            "filter_params": params.urlencode(),
+            "is_filtered": is_filtered,
+            "community": community,
+        },
     )
 
 

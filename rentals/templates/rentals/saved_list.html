@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h4 mb-0">{% if community %}Community{% else %}My Library{% endif %}</h1>
-  <span class="small text-body-secondary">{{ saved_movies|length }} {% if community %}movie{{ saved_movies|length|pluralize }}{% else %}saved movie{{ saved_movies|length|pluralize }}{% endif %}</span>
+  <span class="small text-body-secondary" data-testid="result-count">{{ page_obj.paginator.count }} {% if community %}movie{{ page_obj.paginator.count|pluralize }}{% else %}saved movie{{ page_obj.paginator.count|pluralize }}{% endif %}</span>
 </div>
 
 {% if community %}
@@ -18,20 +18,81 @@
   </p>
 {% endif %}
 
-{% if saved_movies %}
-  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
-    {% for saved in saved_movies %}
-      {% include "rentals/includes/saved_card.html" with show_owner=community %}
-    {% endfor %}
+<div class="row g-4">
+  <aside class="col-lg-3">
+    <div class="card shadow-sm" data-testid="filter-card">
+      <div class="card-body">
+        <h2 class="h6 card-title">Search &amp; filter</h2>
+        {# No `page` field: any change to search, filters or sort starts at page 1. #}
+        <form method="get" action="{{ request.path }}">
+          <div class="mb-3">
+            <label for="{{ filter_form.q.id_for_label }}" class="form-label small mb-1">Search title or notes</label>
+            <input type="search" name="{{ filter_form.q.html_name }}" id="{{ filter_form.q.id_for_label }}"
+                   value="{{ filter_form.q.value|default_if_none:'' }}" class="form-control form-control-sm">
+          </div>
+          {% include "rentals/includes/filter_select.html" with field=filter_form.status %}
+          {% include "rentals/includes/filter_select.html" with field=filter_form.genre %}
+          {% include "rentals/includes/filter_select.html" with field=filter_form.min_rating %}
+          {% if filter_form.visibility %}
+            {% include "rentals/includes/filter_select.html" with field=filter_form.visibility %}
+          {% endif %}
+          <div class="form-check mb-3">
+            <input type="checkbox" name="{{ filter_form.overdue.html_name }}" id="{{ filter_form.overdue.id_for_label }}"
+                   class="form-check-input"{% if filter_form.overdue.value %} checked{% endif %}>
+            <label for="{{ filter_form.overdue.id_for_label }}" class="form-check-label small">Overdue only</label>
+          </div>
+          {% include "rentals/includes/filter_select.html" with field=filter_form.sort %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+            {% if is_filtered or filter_params %}
+              <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Clear filters</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <div class="col-lg-9">
+    {% if saved_movies %}
+      <div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-3">
+        {% for saved in saved_movies %}
+          {% include "rentals/includes/saved_card.html" with show_owner=community %}
+        {% endfor %}
+      </div>
+
+      {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="mt-4" aria-label="Pages" data-testid="pagination">
+          <ul class="pagination pagination-sm justify-content-center">
+            {% if page_obj.has_previous %}
+              <li class="page-item"><a class="page-link" href="?{% if filter_params %}{{ filter_params }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">« Prev</a></li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">« Prev</span></li>
+            {% endif %}
+            <li class="page-item active" aria-current="page"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?{% if filter_params %}{{ filter_params }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next »</a></li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Next »</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+    {% elif is_filtered %}
+      <div class="text-center py-5" data-testid="filters-empty">
+        <p class="text-body-secondary">No saved movies match these filters.</p>
+        <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Clear filters</a>
+      </div>
+    {% elif community %}
+      <div class="text-center py-5" data-testid="community-empty">
+        <p class="text-body-secondary">Nobody has shared any movies with you yet.</p>
+      </div>
+    {% else %}
+      <div class="text-center py-5" data-testid="library-empty">
+        <p class="text-body-secondary">You haven't saved any movies yet.</p>
+        <p class="small">Use the search box at the top of the page to find movies on TMDB.</p>
+      </div>
+    {% endif %}
   </div>
-{% elif community %}
-  <div class="text-center py-5" data-testid="community-empty">
-    <p class="text-body-secondary">Nobody has shared any movies with you yet.</p>
-  </div>
-{% else %}
-  <div class="text-center py-5" data-testid="library-empty">
-    <p class="text-body-secondary">You haven't saved any movies yet.</p>
-    <p class="small">Use the search box at the top of the page to find movies on TMDB.</p>
-  </div>
-{% endif %}
+</div>
 {% endblock %}

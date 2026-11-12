@@ -1,0 +1,9 @@
+{# One hand-rendered <select> for the filter sidebar. Expects `field` (a bound filter-form field). #}
+<div class="mb-3">
+  <label for="{{ field.id_for_label }}" class="form-label small mb-1">{{ field.label }}</label>
+  <select name="{{ field.html_name }}" id="{{ field.id_for_label }}" class="form-select form-select-sm">
+    {% for value, label in field.field.choices %}
+      <option value="{{ value }}"{% if field.value|default_if_none:""|stringformat:"s" == value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</div>
