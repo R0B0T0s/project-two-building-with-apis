@@ -28,6 +28,35 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Implemented Phase 12: `refresh_movies` management command
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement phase 12`
+2. I approve *(TDD behaviors: stale movies refresh and fresh ones are untouched; a TMDB failure keeps data and the command continues; movies with no saved entries are deleted)*
+3. I approve *(cycle 1 RED: `get_movie_details` called 0 times, since the command was an empty stub)*
+4. Move on
+5. I approve *(cycle 2 "RED" was an uncaught `TMDBUnavailable` error, not an assertion failure)*
+6. Move on
+7. I approve *(cycle 3 RED: all three movies remained instead of only the saved one)*
+8. Go ahead *(normal implementation: console output with a summary, the Windows-safe output test, Ruff)*
+9. Manual verification passed
+
+### Summary
+- **Outcome:**
+  - **`rentals/management/commands/refresh_movies.py`**:
+    - It first deletes movies with no saved entries (`saves__isnull=True`), so TMDB is never called for them. Genre rows are kept.
+    - It then re-fetches every movie older than 150 days (`REFRESH_AFTER`, about five months) through `services.store_movie_details`, the save flow's own write path.
+    - On `TMDBUnavailable` it logs a warning with the movie's ID, keeps the existing data and continues.
+  - **Output:** one line per refreshed or failed movie, plus a summary of counts. Each line is encoded with the console's encoding using `errors="replace"`, so ★ and non-Latin titles print as `?` instead of crashing.
+  - **Tests and checks:** `rentals/tests/test_refresh.py` adds 4 tests (the 3 TDD behaviors and a cp1252 output test). 134 tests pass, Ruff and the migration check are clean, and the user passed manual verification.
+- **Deviations:** None from the user. Choices of mine:
+  - Orphans are deleted before the refresh rather than after.
+  - Errors other than `TMDBUnavailable` still stop the command, so real bugs aren't hidden.
+- **Sideways:**
+  - Cycle 2 couldn't fail on an assertion, because the missing behavior was the exception handling itself. This was explained and approved as RED, as in Phase 11.
+  - Cycle 3's first run errored, because the mock returned a `MagicMock` for the stale orphan. Giving it a real return value was a setup fix only, noted before approval.
+  - The output test's first expected string had one `?` too many, because I miscounted the Japanese title's characters. Only the expected string was corrected.
+
 ## 2026-11-12 — Implemented Phase 11: API write access (create, update, delete, 503, edit rule)
 
 ### Prompts
