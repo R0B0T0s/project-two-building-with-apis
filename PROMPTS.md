@@ -28,6 +28,38 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Implemented Phase 11: API write access (create, update, delete, 503, edit rule)
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement Phase 11`
+2. yes, approved *(TDD behaviors: create runs the shared save flow and rental rules; a TMDB failure on create is a 503 that saves nothing; update and delete follow the edit rule across the matrix)*
+3. yes, approved *(cycle 1 RED: POST returned 405, since the viewset was read-only)*
+4. Move on
+5. Approved *(cycle 2 "RED" was an uncaught `TMDBUnavailable` error, not an assertion failure)*
+6. move on
+7. Approved *(cycle 3 RED: 3 of 18 cases were `200 != 404`, for viewers who could see but not edit)*
+8. GO ahead *(normal implementation: duplicate, missing `tmdb_id`, bad values, usernames, Shared with no usernames, generic 503, update rental rules, ignored `tmdb_id`, PUT)*
+9. Manual verification passed
+
+### Summary
+- **Outcome:**
+  - **`SavedMovieViewSet`** is now a `ModelViewSet`. Update, partial update and delete start from `editable_by`, so a viewer who isn't the owner or staff gets 404. Signed-out writes stay 401 through `IsAuthenticatedOrReadOnly`.
+  - **Create** calls `services.save_movie` inside a transaction, applies the optional fields, and calls `change_status` for the rental rule. `perform_create` turns `TMDBUnavailable` into a new `TMDBServiceUnavailable` (503) using the website's wording.
+  - **`SavedMovieSerializer`** gains a write-only `tmdb_id` (required on create, dropped on update) and a write-only `rental_days` (1/2/7, default 2). `status`, `rating`, `notes`, `visibility` and `shared_with` become writable, using a `UsernameField` with the edit form's unknown-username message.
+  - **Validation:**
+    - A duplicate returns 400 before TMDB is called, with an `AlreadySaved` fallback for races.
+    - Shared needs at least one username.
+  - **Update** follows the edit form's rules: only a real status change starts or ends a rental, and `rental_days` alone moves a current rental's due date.
+  - **Tests and checks:** `rentals/tests/test_api_write.py` adds 17 tests. 130 tests pass, Ruff and the migration check are clean, and the user passed manual verification.
+- **Deviations:** None from the user. Choices of mine:
+  - Viewers who can't edit get 404, not 403, following the project convention.
+  - `tmdb_id` on an update is silently ignored rather than rejected.
+- **Sideways:**
+  - Cycle 2 couldn't fail on an assertion, because the missing behavior was the exception handling itself. This was explained and approved as RED.
+  - I first set the unknown-username message by changing the field's error messages in the class body. DRF rebuilds fields for each serializer, so that change would have been lost, and it became a `SlugRelatedField` subclass.
+  - A combined shell heredoc failed to parse and nothing ran. The edits were redone with the file tools.
+  - A test helper named `patch` hid `unittest.mock.patch` inside the class (`TypeError`), and it was renamed `patch_entry`.
+
 ## 2026-11-12 — Implemented Phase 10: API read access and authentication (scopes, view rule, shared filters, tokens)
 
 ### Prompts
