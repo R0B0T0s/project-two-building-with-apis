@@ -28,6 +28,35 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Walkthrough of how `/community/` searches and displays data
+
+### Prompts
+1. Walk me through how http://127.0.0.1:8000/community searches and displays data. Start with the browser controls, then trace the request, view, queryset, Q objects, filters, sorting, pagination, and template. Show the relevant files and explain one part at a time. Identify whether the data comes from our database or an external API. Explain the existing code without changing it.
+2. Update PROMPTS.md. Include what was traced and checked.
+
+### What was traced
+Using one example request (`/community/?q=star&status=&genre=3&min_rating=4&sort=title&page=2`), one layer at a time:
+
+1. **Browser controls:** `rentals/templates/rentals/saved_list.html:27-51` and `includes/filter_select.html`. A GET form (search `q`, status, genre, minimum rating, overdue checkbox, sort) with no `page` field, so any filter change goes back to page 1. Noted that the navbar search (`templates/base.html:22`) also uses `q` but goes to `/find/` (TMDB), which is a different search.
+2. **Routing:** `config/urls.py:10` → `rentals/urls.py:23` (`rentals:community`).
+3. **View:** `rentals/views.py:181-185`. `community()` has no `@login_required`; it picks the starting queryset and calls the shared `_saved_list`.
+4. **Queryset and Q objects:** `rentals/models.py:55-83`. `visible_to` ORs `Q(owner=user) | public | shared_with_user` (Shared uses a `pk__in` subquery on the `shared_with` join table). Signed-out visitors get Public only, and staff get everything. `community_for` then excludes the viewer's own entries.
+5. **Filter setup:** `rentals/views.py:144-147`. `CommunitySavedMovieFilter` gets `request.GET` and the queryset with `select_related("movie", "owner")` (avoids N+1 queries).
+6. **Filters:** `rentals/filters.py:43-117`. `filter_search` ORs `Q(movie__title__icontains) | Q(notes__icontains)` and only narrows rows the viewer can already see. `genre` goes through `movie__genres`, `min_rating` uses `gte` (unrated rows drop out), and `filter_overdue` uses the same rule as `is_overdue` (`models.py:187`). Empty values are skipped. The Community subclass deletes the `visibility` filter.
+7. **Sorting:** `rentals/filters.py:20-40, 104-109`. `SORT_ORDERINGS` with `Lower`, `F(...).desc/asc(nulls_last=True)` and a `-created_at, -id` tie-breaker. With no `sort` in the URL, the model's `Meta.ordering` (`models.py:134`) gives the same order as "Date saved (newest)".
+8. **Pagination:** `rentals/views.py:148-160`. `Paginator(filterset.qs, 12).get_page(...)` is where the query actually runs (COUNT plus LIMIT/OFFSET). Also covered: how bad page numbers are handled, the `viewer_can_edit` flag, and how `filter_params` and `is_filtered` are built.
+9. **Template:** `saved_list.html` and `includes/saved_card.html`. Result count, signed-in vs. signed-out intro text, cards with `show_owner`, Prev/Next links that keep the filters, and the empty states.
+
+### What was checked
+- **Database or external API:** the entries, notes, ratings, status, owner and movie metadata all come from the local database. Search, filtering, sorting, counting and paging all happen in SQL. No TMDB API call happens on this page. The only TMDB traffic is the poster images: `Movie.poster_url` (`models.py:48-51`) only builds an `image.tmdb.org` URL, and the visitor's browser loads the image. TMDB is called live only on `/find/` and when saving a movie.
+- **Privacy:** search can't match another user's Private notes, because every filter narrows the queryset that `community_for` already limited.
+- **Consistency:** `filter_overdue` and `is_overdue` use the same "due before start of today" rule, and the default ordering matches the `saved_new` sort.
+
+### Summary
+- **Outcome:** an explanation only. No code was changed; only this log entry was added. Files were inspected with read-only shell commands (`cat`, `sed`, `grep`). The app was not run and no tests were run, so all points come from reading the code.
+- **Deviations:** none. No follow-up questions were asked.
+- **Sideways:** nothing went wrong. One point was stated from my knowledge of django-filter rather than checked against its source: invalid values (such as `?visibility=private` on Community, or a bogus `status`) are left out of the form's cleaned data and so are ignored.
+
 ## 2026-11-12 — API tour (endpoints, `/api/saved/5/` walkthrough) and `scripts/api_client.py`
 
 ### Prompts
