@@ -28,6 +28,48 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — API tour (endpoints, `/api/saved/5/` walkthrough) and `scripts/api_client.py`
+
+### Prompts
+1. Show me the API endpoints in my project in table format. Choose a list endpoint and a related detail endpoint for me to open in the browser. Explain any authentication needed and give me the URLs for viewing JSON.
+2. Walk me through the api/saved/5 endpoint. Show me the associated model, serializer, and view
+3. Create a Python script in the scripts/ directory that consumes my projects API. The script should have two behaviors: 1. Call one list endpoint with query parameters and print the results. 2. Call one update endpoint that updates one field through the API. Print the before and after results.
+4. Update PROMPTS.md, also include the scripts run instructions.
+
+### Running the script
+
+Start the dev server first (`uv run python manage.py runserver`), then run these from the repo root:
+
+```
+# 1. List (GET /api/saved/) with query parameters. Community works signed out.
+uv run python scripts/api_client.py list
+uv run python scripts/api_client.py list --scope community --q alien --sort title
+uv run python scripts/api_client.py --username tester1 list --scope mine --status rented
+
+# 2. Update one field (PATCH /api/saved/<id>/), printing before and after.
+uv run python scripts/api_client.py --username tester1 update 5 --notes "Family movie night pick"
+uv run python scripts/api_client.py --username tester1 update 5 --rating 4
+```
+
+- **List options:** `--scope mine|community` (default `community`), `--q`, `--status want|rented|watched`, `--genre <TMDB genre ID>`, `--min-rating 1-5`, `--overdue`, `--sort` (one of the `SORT_ORDERINGS` keys, default `title`) and `--page`.
+- **Update options:** the entry ID, then exactly one of `--notes "<text>"` or `--rating 1-5`. Only the owner or staff can update an entry; anyone else gets the API's 404.
+- **Signing in:** `--scope mine` and `update` need an account. `--username` asks for the password and gets a token from `/api/token/`; `--token <key>` uses an existing token. `API_USERNAME`, `API_PASSWORD`, `API_TOKEN` and `API_BASE_URL` (default `http://127.0.0.1:8000`) work as environment variables too.
+- **Windows:** if the ★ ratings fail to print, set `PYTHONIOENCODING=utf-8` first.
+
+### Summary
+- **Outcome:**
+  - **Prompt 1:** a table of the API endpoints (`/api/`, `/api/saved/` list and create, `/api/saved/<id>/` retrieve, update and delete, `/api/token/`, `/api-auth/`). I picked the community list and Public entry #5 as URLs that work signed out, gave `?format=json` links, and explained Token and Session auth with `IsAuthenticatedOrReadOnly`.
+  - **Prompt 2:** a walkthrough of `GET /api/saved/5/`: the router, `ModelViewSet.retrieve` with `get_queryset` using `visible_to` (404, not 403), the `SavedMovie`/`Movie`/`Genre` models, and `SavedMovieSerializer` (nested movie, write-only `tmdb_id`/`rental_days`, `shared_with` dropped for non-editors). It included the real JSON from a signed-out request.
+  - **Prompt 3:** `scripts/api_client.py`, a `requests`-based client with `list` and `update` subcommands that talks to the API over HTTP only and imports no project code. Ruff format and check pass. Tested on a dev server on port 8765: the community list returned #7 and #5, signed-out `--scope mine` gave a clear error, the #5 notes update showed before and after, and updating Employee's #1 as tester1 gave a 404.
+- **Deviations:** None from the user. Choices of mine:
+  - The list defaults to `--scope community` and `--sort title` so it works with no account.
+  - The update covers `notes` or `rating` (one field per run).
+  - No tests were added for the script; it was checked by hand against a live server.
+- **Sideways:**
+  - The first printed list URL joined parameters with `, ` instead of `&`; it was fixed after the first test run.
+  - The update test changed real dev data. #5's notes were set back to empty afterward, and a DRF token for tester1 was got or created in `db.sqlite3`.
+  - My first attempt to stop the test server used PowerShell through Bash, so `$_` was mangled. It was stopped with the PowerShell tool, which triggered a "failed, exit code 127" notification for the killed server, not a real failure.
+
 ## 2026-11-12 — Implemented Phase 12: `refresh_movies` management command
 
 ### Prompts
