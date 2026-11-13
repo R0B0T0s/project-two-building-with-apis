@@ -72,6 +72,16 @@ class SavedMovieQuerySet(models.QuerySet):
         )
         return self.filter(models.Q(owner=user) | public | shared_with_user)
 
+    def community_for(self, user):
+        """Community: other users' entries ``user`` may view.
+
+        Shared by the website's Community page and the API's community scope.
+        """
+        queryset = self.visible_to(user)
+        if user and user.is_authenticated:
+            queryset = queryset.exclude(owner=user)
+        return queryset
+
     def editable_by(self, user):
         """Entries ``user`` may edit or delete: the owner and staff only."""
         if is_staff_user(user):

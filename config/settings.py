@@ -159,3 +159,19 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+
+# Django REST Framework: session login (browsable API) plus DRF tokens.
+# Signed-out callers may read (Public entries only); writes need a login.
+# Token comes first so "not signed in" is a 401 with a WWW-Authenticate
+# header (with Session first, DRF would answer 403 instead).
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ],
+}

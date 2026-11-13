@@ -180,10 +180,9 @@ def library(request):
 
 def community(request):
     """Community: other users' entries the viewer may see (open to everyone)."""
-    queryset = SavedMovie.objects.visible_to(request.user)
-    if request.user.is_authenticated:
-        queryset = queryset.exclude(owner=request.user)
-    return _saved_list(request, queryset, community=True)
+    return _saved_list(
+        request, SavedMovie.objects.community_for(request.user), community=True
+    )
 
 
 def saved_detail(request, pk):

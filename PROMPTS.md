@@ -28,6 +28,32 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-12 — Implemented Phase 10: API read access and authentication (scopes, view rule, shared filters, tokens)
+
+### Prompts
+1. `/implement @prd/movie-rental.md @plans/movie-rental.md Implement phase 10`
+2. I approve *(design, including 401 for signed-out `scope=mine` and 400 for an unknown scope; TDD behaviors: `scope=community` matches the website's Community page; retrieve follows `visible_to` across the view matrix; search/filter/sort/page parameters match My Library, including an out-of-range page)*
+3. Yes, make it pass *(cycle 1 RED: `scope=community` returned only my own entry)*
+4. Move on
+5. Yes, make it pass *(cycle 2 RED: 9 of 18 viewer × visibility cases got 404, and 3 signed-out cases crashed on `owner=AnonymousUser`)*
+6. Move on
+7. Yes, make it pass *(cycle 3 RED: sort, search and min_rating were ignored, and page 99 was a 404)*
+8. Go ahead *(normal implementation: scope errors, signed-out reads, tokens, browsable API, embedding, `shared_with` hiding)*
+9. Manual verification passed
+
+### Summary
+- **Outcome:**
+  - **New files:** `rentals/serializers.py`, `rentals/api.py` and `rentals/api_urls.py`. A read-only `SavedMovieViewSet` is mounted at `/api/saved/`. `/api/token/` uses DRF's `obtain_auth_token`, and `/api-auth/` provides the browsable API's login links.
+  - **Movie embedding:** each entry embeds the movie read-only (`tmdb_id`, title, year, overview, poster path/url, genres, `fetched_at`). `shared_with` usernames are shown only to the owner and staff, matching the detail page.
+  - **Scopes:** list takes `scope=mine` (the default) or `scope=community`. A new `SavedMovie.objects.community_for(user)` method now backs both the website's Community view and the API.
+  - **Retrieve** uses `visible_to`, so hidden entries are 404s.
+  - **Filtering:** the API reuses `SavedMovieFilter` / `CommunitySavedMovieFilter` through `DjangoFilterBackend`.
+  - **Pagination:** `SavedMoviePagination` uses `PAGE_SIZE` and `Paginator.get_page`, so an out-of-range page gives the last page, like the website.
+  - **Settings:** `REST_FRAMEWORK` sets Token then Session authentication with `IsAuthenticatedOrReadOnly`.
+  - **Tests and checks:** `rentals/tests/test_api.py` adds 16 tests. 113 tests pass, Ruff and the migration check are clean, and the user passed manual verification.
+- **Deviations:** None from the user. Two choices of mine the user approved: a signed-out `scope=mine` returns 401, and an unknown scope returns 400. Token authentication is listed before Session so that "not signed in" is a 401 rather than DRF's 403.
+- **Sideways:** Cycle 1's first run errored, because pagination wasn't wired yet and `response.data` was a list. Plain 12-per-page pagination was added as scaffolding before the real RED. Cycle 2's RED included 3 `TypeError` crashes for signed-out viewers; these were accepted as real behavior failures, not missing scaffolding. Cycle 3's count assertion was tidied to `paginator.count` before approval. One shell heredoc failed to parse while adding the remaining tests, nothing ran, and the edits were redone with the file tools.
+
 ## 2026-11-12 — Implemented Phase 9: search, filter, sort and pagination (shared filter set, 12 per page)
 
 ### Prompts
